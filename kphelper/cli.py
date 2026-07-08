@@ -39,6 +39,8 @@ examples:
   kphelper checksec
   kphelper checksec rootfs.cpio
   kphelper pack
+  kphelper symbols
+  kphelper ksym
   kphelper run
   kphelper debug
   kphelper debug ./vmlinux

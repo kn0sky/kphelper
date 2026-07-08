@@ -10,6 +10,8 @@ _EXPORTS = {
     "close_debugger": ("kphelper.core.debug", "close_debugger"),
     "kgdb": ("kphelper.core.debug", "kgdb"),
     "pack_exp": ("kphelper.core.pack", "pack_exp"),
+    "symbols_report": ("kphelper.core.symbols", "symbols_report"),
+    "guest_ksym_report": ("kphelper.core.ksym", "guest_ksym_report"),
     "create_debug_run_copy": ("kphelper.core.runfile", "create_debug_run_copy"),
     "build_only": ("kphelper.core.workflow", "build_only"),
     "upload_and_cd": ("kphelper.core.workflow", "upload_and_cd"),

@@ -4,7 +4,9 @@ from pathlib import Path
 
 from kphelper.core.checksec import detect_runsec, extract_cmdline, extract_initrd
 from kphelper.core.discovery import find_cpio, find_vmlinux
+from kphelper.core.ksym import parse_kallsyms, parse_kptr_value
 from kphelper.core.runfile import create_debug_run_copy, update_run_initrd
+from kphelper.core.symbols import render_symbols
 
 
 class ChecksecParsingTests(unittest.TestCase):
@@ -109,6 +111,35 @@ class PackTests(unittest.TestCase):
             self.assertIn("-s", debug_text)
             self.assertIn("-S", debug_text)
             self.assertIn('console=ttyS0 nokaslr', debug_text)
+
+
+class SymbolTests(unittest.TestCase):
+    def test_render_symbols_outputs_c_macros_and_missing(self):
+        output = render_symbols(
+            "vmlinux",
+            {"commit_creds": 0xffffffff81080000},
+            names=("commit_creds", "prepare_kernel_cred"),
+        )
+
+        self.assertIn("#define COMMIT_CREDS", output)
+        self.assertIn("0xffffffff81080000", output)
+        self.assertIn("// missing: prepare_kernel_cred", output)
+
+    def test_parse_guest_kptr_value(self):
+        output = "cat /proc/sys/kernel/kptr_restrict\n0\n"
+
+        self.assertEqual(parse_kptr_value(output), 0)
+
+    def test_parse_kallsyms_ignores_hidden_zero_addresses(self):
+        output = "\n".join([
+            "0000000000000000 T commit_creds",
+            "ffffffff81081234 T prepare_kernel_cred",
+        ])
+
+        symbols = parse_kallsyms(output, ("commit_creds", "prepare_kernel_cred"))
+
+        self.assertNotIn("commit_creds", symbols)
+        self.assertEqual(symbols["prepare_kernel_cred"], 0xffffffff81081234)
 
 
 if __name__ == "__main__":

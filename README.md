@@ -128,6 +128,49 @@ cat /sys/module/<module>/sections/.text
 add-symbol-file <module.ko> <base>
 ```
 
+### `kphelper symbols [vmlinux]`
+
+Extract useful fixed addresses from `vmlinux`, mainly for `nokaslr` challenges.
+
+```bash
+kphelper symbols
+kphelper symbols ./vmlinux
+kphelper symbols -s commit_creds -s prepare_kernel_cred
+kphelper symbols --json
+```
+
+Default symbols:
+
+```text
+commit_creds
+prepare_kernel_cred
+init_cred
+swapgs_restore_regs_and_return_to_usermode
+```
+
+Default output is C macro style for quick copy/paste into `exp.c`.
+
+### `kphelper ksym`
+
+Boot the guest once, read `/proc/kallsyms`, print selected symbol addresses, then close the session. This is useful when the challenge only gives `bzImage` but the runtime rootfs exposes kernel pointers.
+
+```bash
+kphelper ksym
+kphelper ksym -s commit_creds -s prepare_kernel_cred
+kphelper ksym --json
+kphelper ksym --remote 127.0.0.1 1337
+```
+
+Requirements:
+
+```text
+/proc is mounted or mountable
+/proc/kallsyms is readable
+/proc/sys/kernel/kptr_restrict is 0
+```
+
+If `kptr_restrict` is not `0`, `kphelper ksym` exits with a clear error instead of printing zero addresses.
+
 ### `kphelper remote <ip> <port>`
 
 Compile `exp.c` if present, connect to a remote shell, upload `exp` if available, switch to `/tmp`, then enter interactive mode.
