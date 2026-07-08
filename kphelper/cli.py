@@ -36,6 +36,7 @@ command extension:
 examples:
   kphelper checksec
   kphelper checksec rootfs.cpio
+  kphelper pack
   kphelper run
   kphelper debug
   kphelper debug ./vmlinux

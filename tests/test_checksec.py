@@ -4,6 +4,7 @@ from pathlib import Path
 
 from kphelper.core.checksec import detect_runsec, extract_cmdline, extract_initrd
 from kphelper.core.discovery import find_cpio, find_vmlinux
+from kphelper.core.runfile import update_run_initrd
 
 
 class ChecksecParsingTests(unittest.TestCase):
@@ -80,6 +81,18 @@ class DiscoveryTests(unittest.TestCase):
             (base / "dist" / "rootfs.cpio.gz").write_text("")
 
             self.assertEqual(find_cpio(base), base / "dist" / "rootfs.cpio.gz")
+
+
+class PackTests(unittest.TestCase):
+    def test_update_run_initrd_rewrites_direct_path_and_creates_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_path = Path(tmp) / "run.sh"
+            run_path.write_text("qemu-system-x86_64 -initrd rootfs.cpio -append 'console=ttyS0'\n")
+
+            update_run_initrd(run_path, "packed-rootfs.cpio.gz")
+
+            self.assertIn("-initrd packed-rootfs.cpio.gz", run_path.read_text())
+            self.assertTrue((Path(tmp) / "run.sh.bak").exists())
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ _EXPORTS = {
     "upload": ("kphelper.core.upload", "upload"),
     "close_debugger": ("kphelper.core.debug", "close_debugger"),
     "kgdb": ("kphelper.core.debug", "kgdb"),
+    "pack_exp": ("kphelper.core.pack", "pack_exp"),
     "build_only": ("kphelper.core.workflow", "build_only"),
     "upload_and_cd": ("kphelper.core.workflow", "upload_and_cd"),
     "cd_remote_tmp": ("kphelper.core.session", "cd_remote_tmp"),

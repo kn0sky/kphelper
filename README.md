@@ -116,6 +116,31 @@ Compile `exp.c` if present, connect to a remote shell, upload `exp` if available
 kphelper remote 127.0.0.1 1337
 ```
 
+### `kphelper pack [cpio]`
+
+Inject `exp` into an initramfs and update `run.sh` to use the repacked archive. This is the offline fallback path for challenges where shell upload is inconvenient or unavailable.
+
+```bash
+kphelper pack
+kphelper pack rootfs.cpio
+kphelper pack rootfs.cpio.gz -o packed-rootfs.cpio.gz
+kphelper pack --target tmp/exp --no-update-run
+```
+
+Default behavior:
+
+```text
+1. compile exp.c to exp if exp.c exists
+2. find the initramfs from run.sh -initrd or current tree
+3. unpack it into ./root-pack
+4. copy exp to ./root-pack/tmp/exp and chmod 755
+5. repack as newc+gzip into packed-rootfs.cpio.gz
+6. backup run.sh to run.sh.bak
+7. rewrite run.sh -initrd to point to packed-rootfs.cpio.gz
+```
+
+Current limitation: `pack` only rewrites direct `-initrd path` arguments. It does not rewrite variable-built QEMU arguments.
+
 ### `kphelper checksec [cpio]`
 
 Inspect common kernel challenge security settings from `run.sh`. Optionally unpack an initramfs cpio into `./root` and scan its `init`.
@@ -172,10 +197,10 @@ def handle(args):
     return 0
 ```
 
-For example, `kphelper/commands/kp_pack.py` automatically becomes:
+For example, `kphelper/commands/kp_snapshot.py` automatically becomes:
 
 ```bash
-kphelper pack
+kphelper snapshot
 ```
 
 Shared reusable logic lives under:

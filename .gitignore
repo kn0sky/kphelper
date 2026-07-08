@@ -31,7 +31,9 @@ Thumbs.db
 
 # Kernel pwn challenge artifacts generated in working directories
 root/
+root-pack/
 exp
+packed-rootfs.cpio.gz
 *.o
 *.ko.cmd
 *.mod
