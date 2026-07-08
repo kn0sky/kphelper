@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from .discovery import find_cpio
+from .errors import KphelperError
 
 
 UNKNOWN = "Unknown"
@@ -134,7 +135,10 @@ def unpack_cpio(cpio_path, root_dir="root"):
     root_dir = Path(root_dir)
     root_dir.mkdir(exist_ok=True)
     cmd = cpio_command(cpio_path)
-    subprocess.run(cmd, shell=True, cwd=root_dir, check=True)
+    try:
+        subprocess.run(cmd, shell=True, cwd=root_dir, check=True)
+    except subprocess.CalledProcessError as e:
+        raise KphelperError("failed to unpack %s, exit code: %d" % (cpio_path, e.returncode)) from e
     return root_dir
 
 
@@ -281,7 +285,7 @@ def run_checksec(run_path="run.sh", cpio_path=None, root_dir="root", color=True)
     if cpio_path:
         run_result["Initrd"] = str(cpio_path)
         if not shutil.which("cpio"):
-            raise RuntimeError("cpio not found")
+            raise KphelperError("cpio not found")
         unpacked = unpack_cpio(cpio_path, root_dir)
         init_result = scan_init(unpacked)
     return render_report(run_result, init_result, color=color)

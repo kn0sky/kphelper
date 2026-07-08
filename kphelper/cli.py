@@ -4,6 +4,8 @@ import pkgutil
 import sys
 
 from . import commands
+from .core.errors import KphelperError
+from .core.pwn import log
 
 
 HELP_EPILOG = """\
@@ -88,4 +90,11 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
-    return args.handler(args)
+    try:
+        return args.handler(args)
+    except KeyboardInterrupt:
+        log.failure("interrupted")
+        return 130
+    except KphelperError as e:
+        log.failure(str(e))
+        return 1

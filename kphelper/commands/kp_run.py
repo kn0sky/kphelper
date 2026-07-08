@@ -8,7 +8,12 @@ def register(subparsers):
 
 
 def handle(args):
-    io = core.local_target()
-    core.prepare_target(io)
-    core.interact(io)
+    core.build_only()
+    io = None
+    try:
+        io = core.local_target()
+        core.upload_and_cd(io)
+        core.interact(io)
+    finally:
+        core.close_session(io)
     return 0

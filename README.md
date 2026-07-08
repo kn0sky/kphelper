@@ -4,6 +4,13 @@
 
 The intended runtime environment is Linux/WSL.
 
+Supported baseline:
+
+```text
+Python >= 3.8
+pwntools >= 4.12, < 5
+```
+
 ## Install
 
 From this repository:
@@ -19,6 +26,12 @@ kphelper
 ```
 
 Running without arguments prints the help text.
+
+Run the regression tests with:
+
+```bash
+python3 -m unittest
+```
 
 ## Directory Requirements
 
@@ -37,11 +50,17 @@ vmlinux
 Exploit upload is optional:
 
 ```text
-exp.c    # compiled with musl-gcc -static -o exp exp.c
+exp.c    # compiled to exp before target startup
 exp      # uploaded to /tmp/exp
 ```
 
-If `exp.c` exists, it is compiled first. If neither `exp.c` nor `exp` exists, upload is skipped.
+If `exp.c` exists, it is compiled before QEMU is started. `kphelper` tries `musl-gcc` first and falls back to:
+
+```bash
+gcc -static -Os -s -o exp exp.c
+```
+
+If both compilers fail, the command exits before starting QEMU. If neither `exp.c` nor `exp` exists, upload is skipped.
 
 The target shell prompt may be either:
 
@@ -50,13 +69,13 @@ $
 # 
 ```
 
-After upload, `kphelper` only switches to `/tmp`; it does not execute `/tmp/exp` automatically.
+After upload, `kphelper` checks the remote file size with `wc -c < /tmp/exp`. If verification succeeds, it switches to `/tmp`; it does not execute `/tmp/exp` automatically.
 
 ## Commands
 
 ### `kphelper run`
 
-Start local `./run.sh`, compile/upload `exp` if available, switch to `/tmp`, then enter interactive mode.
+Compile `exp.c` if present, start local `./run.sh`, upload `exp` if available, switch to `/tmp`, then enter interactive mode.
 
 ```bash
 kphelper run
@@ -64,7 +83,7 @@ kphelper run
 
 ### `kphelper debug [symbol]`
 
-Start local `./run.sh`, prepare the target, then open KGDB in a tmux split.
+Pre-check `run.sh`, compile `exp.c` if present, start local `./run.sh`, prepare the target, then open KGDB in a tmux split.
 
 ```bash
 kphelper debug
@@ -74,9 +93,24 @@ kphelper debug ./module.ko
 
 The default symbol file is `vmlinux`.
 
+`debug` requires `run.sh` to expose a QEMU gdbstub through `-s`, `-S`, or `-gdb`. If KASLR is detected, `kphelper` warns but continues.
+
+For `vmlinux`, `kphelper` only connects with:
+
+```text
+target remote localhost:1234
+```
+
+For `.ko` files, module symbols are not auto-loaded because the module base is runtime-dependent. GDB prints the manual steps:
+
+```text
+cat /sys/module/<module>/sections/.text
+add-symbol-file <module.ko> <base>
+```
+
 ### `kphelper remote <ip> <port>`
 
-Connect to a remote shell, compile/upload `exp` if available, switch to `/tmp`, then enter interactive mode.
+Compile `exp.c` if present, connect to a remote shell, upload `exp` if available, switch to `/tmp`, then enter interactive mode.
 
 ```bash
 kphelper remote 127.0.0.1 1337
@@ -100,6 +134,15 @@ The output uses color by default:
 - Red: disabled, missing, or risky status
 - Yellow: unknown
 - Cyan: paths and informational values
+
+Current limitation: `checksec` parses `run.sh` statically with regexes. It works for ordinary direct QEMU invocations, but does not reliably resolve shell variables or argument construction such as:
+
+```bash
+cmdline="console=ttyS0 nokaslr"
+qemu-system-x86_64 -append "$cmdline"
+```
+
+In those cases `Unknown` means "not statically resolved", not necessarily disabled or absent.
 
 ## Command Extension
 

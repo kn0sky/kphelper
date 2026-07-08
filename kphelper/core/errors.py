@@ -1,0 +1,2 @@
+class KphelperError(RuntimeError):
+    pass

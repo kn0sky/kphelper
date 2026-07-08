@@ -3,8 +3,17 @@ from .session import cd_remote_tmp
 from .upload import upload
 
 
-def prepare_target(io):
-    build_exp()
+def build_only():
+    return build_exp()
+
+
+def upload_and_cd(io):
     uploaded = upload(io)
     if uploaded:
         cd_remote_tmp(io)
+    return uploaded
+
+
+def prepare_target(io):
+    build_only()
+    return upload_and_cd(io)

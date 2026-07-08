@@ -13,8 +13,6 @@ SKIP_DIRS = {
     "venv",
     "env",
     "root",
-    "build",
-    "dist",
 }
 
 CPIO_SUFFIXES = (

@@ -11,8 +11,17 @@ def remote_target(ip, port):
 
 
 def cd_remote_tmp(io):
-    io.sendlineafter(PROMPTS, b"cd " + REMOTE_DIR.encode())
+    io.sendline(b"cd " + REMOTE_DIR.encode())
 
 
 def interact(io):
     io.interactive()
+
+
+def close_session(io):
+    if io is None:
+        return
+    try:
+        io.close()
+    except Exception:
+        pass

@@ -10,7 +10,12 @@ def register(subparsers):
 
 
 def handle(args):
-    io = core.remote_target(args.ip, args.port)
-    core.prepare_target(io)
-    core.interact(io)
+    core.build_only()
+    io = None
+    try:
+        io = core.remote_target(args.ip, args.port)
+        core.upload_and_cd(io)
+        core.interact(io)
+    finally:
+        core.close_session(io)
     return 0
