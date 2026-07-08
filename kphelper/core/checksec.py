@@ -123,12 +123,27 @@ def unpack_cpio(cpio_path, root_dir="root"):
     return root_dir
 
 
+def startup_script_paths(root_dir):
+    root_dir = Path(root_dir)
+    candidates = [
+        root_dir / "init",
+        root_dir / "etc" / "inittab",
+        root_dir / "etc" / "rcS",
+        root_dir / "etc" / "init.d" / "rcS",
+    ]
+    init_d = root_dir / "etc" / "init.d"
+    if init_d.is_dir():
+        candidates.extend(sorted(path for path in init_d.iterdir() if path.is_file()))
+    return [path for path in candidates if path.exists()]
+
+
 def scan_init(root_dir):
     root_dir = Path(root_dir)
-    init = root_dir / "init"
+    scripts = startup_script_paths(root_dir)
     result = {
         "Rootfs": str(root_dir),
         "Init": "Missing",
+        "Scripts": "Missing",
         "Root shell": UNKNOWN,
         "Module load": UNKNOWN,
         "kptr_restrict": UNKNOWN,
@@ -137,16 +152,20 @@ def scan_init(root_dir):
         "Module base leak": UNKNOWN,
         "Device permissions": UNKNOWN,
     }
-    if not init.exists():
+    if not scripts:
         return result
 
-    text = read_text(init)
-    result["Init"] = str(init)
+    texts = {path: read_text(path) for path in scripts}
+    text = "\n".join(texts.values())
+    init = root_dir / "init"
+    if init.exists():
+        result["Init"] = str(init)
+    result["Scripts"] = ", ".join(str(path) for path in scripts)
 
-    if re.search(r"\b(sh|bash|cttyhack\s+sh)\b", text) and not has_any(text, ["setuidgid", "su "]):
-        result["Root shell"] = "Likely root"
-    elif has_any(text, ["setuidgid", "su "]):
+    if has_any(text, ["setuidgid", "su "]):
         result["Root shell"] = "Likely non-root"
+    elif re.search(r"\b(sh|bash|cttyhack\s+sh)\b", text):
+        result["Root shell"] = "Likely root"
 
     if re.search(r"\binsmod\b|\bmodprobe\b", text):
         result["Module load"] = "Found"
@@ -223,6 +242,7 @@ def render_report(run_result, init_result=None, color=True):
         for key in [
             "Rootfs",
             "Init",
+            "Scripts",
             "Root shell",
             "Module load",
             "kptr_restrict",
