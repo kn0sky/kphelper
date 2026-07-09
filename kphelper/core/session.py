@@ -5,7 +5,7 @@ from .pwn import process, remote
 
 
 def local_target(run_path="./run.sh"):
-    return process(str(run_path))
+    return process(["bash", str(run_path)])
 
 
 def remote_target(ip, port):

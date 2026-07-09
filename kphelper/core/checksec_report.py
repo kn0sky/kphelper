@@ -2,9 +2,9 @@ from .formatting import BOLD, BLUE, CYAN, DIM, DISABLED, ENABLED, GREEN, MAGENTA
 
 
 def status_color(name, value):
-    if value in {ENABLED, "Found", "Likely non-root", "Configured in init", "Referenced"}:
+    if value in {ENABLED, "Found", "Likely non-root", "Configured in init", "Referenced", "Readable"}:
         return GREEN
-    if value in {DISABLED, "Missing", "Likely root"}:
+    if value in {DISABLED, "Missing", "Likely root", "Hidden"}:
         return RED
     if value == UNKNOWN:
         return YELLOW

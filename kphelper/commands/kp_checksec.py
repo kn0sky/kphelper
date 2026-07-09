@@ -1,5 +1,6 @@
 from kphelper.core.checksec import run_checksec
 from kphelper.core.probe import probe_guest_runtime
+from kphelper.core.probe_report import render_live_report
 
 
 def register(subparsers):
@@ -39,7 +40,8 @@ def register(subparsers):
 
 def handle(args):
     if args.live:
-        print(probe_guest_runtime(args.run, timeout=8))
+        live_result = probe_guest_runtime(args.run, timeout=8)
+        print(render_live_report(live_result, color=not args.no_color))
         return 0
-    print(run_checksec(args.run, args.cpio, args.root, color=not args.no_color, live=args.live))
+    print(run_checksec(args.run, args.cpio, args.root, color=not args.no_color))
     return 0
