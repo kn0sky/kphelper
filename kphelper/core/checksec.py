@@ -168,7 +168,7 @@ def detect_sysctl_write(text, name):
     return match.group(1)
 
 
-def run_checksec(run_path="run.sh", cpio_path=None, root_dir="root", color=True):
+def run_checksec(run_path="run.sh", cpio_path=None, root_dir="root", color=True, live=False):
     run_result = detect_runsec(run_path)
     init_result = None
     if cpio_path is None:
@@ -181,4 +181,5 @@ def run_checksec(run_path="run.sh", cpio_path=None, root_dir="root", color=True)
             raise KphelperError("cpio not found")
         unpacked = unpack_cpio(cpio_path, root_dir)
         init_result = scan_init(unpacked)
+    # live 参数预留给后续动态探测；当前保留接口，不改变静态行为。
     return render_report(run_result, init_result, color=color)

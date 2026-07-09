@@ -1,4 +1,5 @@
 from kphelper.core.checksec import run_checksec
+from kphelper.core.probe import probe_guest_runtime
 
 
 def register(subparsers):
@@ -27,10 +28,18 @@ def register(subparsers):
         action="store_true",
         help="disable ANSI color output",
     )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="reserve live runtime probing mode for future dynamic checks",
+    )
     parser.set_defaults(handler=handle)
     return parser
 
 
 def handle(args):
-    print(run_checksec(args.run, args.cpio, args.root, color=not args.no_color))
+    if args.live:
+        print(probe_guest_runtime(args.run, timeout=8))
+        return 0
+    print(run_checksec(args.run, args.cpio, args.root, color=not args.no_color, live=args.live))
     return 0
