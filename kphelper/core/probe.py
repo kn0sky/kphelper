@@ -4,13 +4,24 @@ from .ksym import GuestShell, parse_kptr_value, parse_kallsyms
 from .symbols import DEFAULT_SYMBOLS
 
 
+class LiveProbeError(KphelperError):
+    pass
+
+
+def _ensure_shell(shell):
+    if not shell.ready:
+        raise LiveProbeError("live probe did not reach an interactive shell prompt")
+
+
 def probe_kallsyms(io, timeout=8, names=DEFAULT_SYMBOLS):
     shell = GuestShell(io, timeout=timeout)
     shell.run("test -r /proc/kallsyms || mount -t proc none /proc 2>/dev/null || true")
+    _ensure_shell(shell)
+
     kptr_output, _status = shell.run("cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo unknown")
     kptr = parse_kptr_value(kptr_output)
     if kptr is None:
-        raise KphelperError("cannot read /proc/sys/kernel/kptr_restrict")
+        raise LiveProbeError("cannot read /proc/sys/kernel/kptr_restrict")
 
     if kptr != 0:
         return {"kptr_restrict": kptr, "kallsyms": "Hidden", "module_base_leak": "Hidden"}
