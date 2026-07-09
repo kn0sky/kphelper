@@ -2,15 +2,11 @@ import re
 import shutil
 from pathlib import Path
 
+from .formatting import DISABLED, ENABLED, UNKNOWN
 from .checksec_report import render_report
 from .cpio import unpack_cpio
 from .discovery import find_cpio
 from .errors import KphelperError
-
-
-UNKNOWN = "Unknown"
-ENABLED = "Enabled"
-DISABLED = "Disabled"
 
 
 def read_text(path):

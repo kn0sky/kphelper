@@ -1,4 +1,4 @@
-from .checksec import BOLD, BLUE, CYAN, DIM, DISABLED, ENABLED, GREEN, MAGENTA, RED, RESET, UNKNOWN, YELLOW, colorize
+from .formatting import BOLD, BLUE, CYAN, DIM, DISABLED, ENABLED, GREEN, MAGENTA, RED, UNKNOWN, YELLOW, colorize
 
 
 def status_color(name, value):
