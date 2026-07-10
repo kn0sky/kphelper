@@ -189,7 +189,7 @@ class SymbolTests(unittest.TestCase):
 
         self.assertEqual(parse_kptr_value(output), 0)
 
-    def test_parse_kallsyms_ignores_hidden_zero_addresses(self):
+    def test_parse_kallsyms_preserves_hidden_zero_addresses(self):
         output = "\n".join([
             "0000000000000000 T commit_creds",
             "ffffffff81081234 T prepare_kernel_cred",
@@ -197,7 +197,7 @@ class SymbolTests(unittest.TestCase):
 
         symbols = parse_kallsyms(output, ("commit_creds", "prepare_kernel_cred"))
 
-        self.assertNotIn("commit_creds", symbols)
+        self.assertEqual(symbols["commit_creds"], 0)
         self.assertEqual(symbols["prepare_kernel_cred"], 0xffffffff81081234)
 
 

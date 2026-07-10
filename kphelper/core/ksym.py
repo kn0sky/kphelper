@@ -22,22 +22,18 @@ def parse_kallsyms(output, names=DEFAULT_SYMBOLS):
     wanted = set(names)
     result = {}
     for line in output.splitlines():
-        parts = line.strip().split()
-        if len(parts) < 3:
+        match = re.search(r"\b([0-9a-fA-F]{8,16})\s+\S\s+(\S+)", line)
+        if not match:
             continue
-        address, _kind, name = parts[:3]
-        if name not in wanted or not re.fullmatch(r"[0-9a-fA-F]+", address):
-            continue
-        value = int(address, 16)
-        if value:
-            result[name] = value
+        address, name = match.groups()
+        if name in wanted:
+            result[name] = int(address, 16)
     return result
 
 
-def kallsyms_grep_command(names):
-    for name in names:
-        validate_symbol_name(name)
-    return "for s in %s; do grep \" $s$\" /proc/kallsyms; done" % " ".join(names)
+def kallsyms_grep_command(name):
+    validate_symbol_name(name)
+    return "grep ' %s$' /proc/kallsyms" % name
 
 
 def extract_guest_ksyms(io, names=DEFAULT_SYMBOLS, timeouts=None):
@@ -53,8 +49,17 @@ def extract_guest_ksyms(io, names=DEFAULT_SYMBOLS, timeouts=None):
         )
     if kptr != 0:
         raise KphelperError("/proc/kallsyms addresses are hidden: kptr_restrict=%d" % kptr)
-    output, _status = shell.run(kallsyms_grep_command(names))
-    symbols = parse_kallsyms(output, names)
-    if not symbols:
-        raise KphelperError("no requested non-zero symbols found in /proc/kallsyms")
+
+    symbols = {}
+    failures = []
+    for name in names:
+        output, status = shell.run(kallsyms_grep_command(name))
+        parsed = parse_kallsyms(output, (name,))
+        if name in parsed:
+            symbols[name] = parsed[name]
+        elif status not in {0, 1}:
+            failures.append("%s(status=%s)" % (name, status))
+
+    if not symbols and failures:
+        raise KphelperError("failed to query /proc/kallsyms: %s" % ", ".join(failures))
     return symbols
