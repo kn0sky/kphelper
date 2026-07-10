@@ -37,13 +37,13 @@ def parse_kallsyms(output, names=DEFAULT_SYMBOLS):
 def kallsyms_grep_command(names):
     for name in names:
         validate_symbol_name(name)
-    return "for s in %s; do grep \" $s$\" /proc/kallsyms 2>/dev/null; done" % " ".join(names)
+    return "for s in %s; do grep \" $s$\" /proc/kallsyms; done" % " ".join(names)
 
 
 def extract_guest_ksyms(io, names=DEFAULT_SYMBOLS, timeouts=None):
     shell = GuestShell(io, timeouts=timeouts or GuestTimeouts())
-    shell.run("test -r /proc/kallsyms || mount -t proc none /proc 2>/dev/null || true")
-    kptr_output, kptr_status = shell.run("cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo unknown")
+    shell.run("test -r /proc/kallsyms || mount -t proc none /proc || true")
+    kptr_output, kptr_status = shell.run("cat /proc/sys/kernel/kptr_restrict || echo unknown")
     kptr = parse_kptr_value(kptr_output)
     if kptr is None:
         detail = kptr_output.strip() or "no output"

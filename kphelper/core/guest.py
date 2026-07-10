@@ -83,6 +83,6 @@ class GuestShell:
         output = data.rsplit(marker_prefix, 1)[0]
         text = output.decode(errors="replace")
         lines = text.splitlines()
-        if lines and lines[0].strip() == command.strip():
+        while lines and (lines[0].strip() in command or lines[0].strip().startswith("HELPER_")):
             lines = lines[1:]
         return "\n".join(lines).strip(), status
