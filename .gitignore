@@ -45,3 +45,4 @@ modules.order
 # Local Codex/agent metadata
 .codex/
 .agents/
+ROADMAP.md

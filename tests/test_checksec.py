@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from kphelper.core.analysis import _patch_init_for_root
 from kphelper.core.checksec import (
     detect_runsec,
     detect_sysctl_write,
@@ -161,6 +162,19 @@ class DiscoveryTests(unittest.TestCase):
             self.assertEqual(find_cpio(base), base / "dist" / "rootfs.cpio.gz")
 
 
+class AnalysisRootfsTests(unittest.TestCase):
+    def test_patch_init_removes_setuidgid_and_adds_sysctl_before_shell(self):
+        original = "#!/bin/sh\ninsmod vuln.ko\nexec setsid cttyhack setuidgid 1000 sh\n"
+
+        patched, changes = _patch_init_for_root(original)
+
+        self.assertIn("insmod vuln.ko", patched)
+        self.assertNotIn("setuidgid 1000", patched)
+        self.assertIn("kptr_restrict", patched)
+        self.assertLess(patched.index("kptr_restrict"), patched.index("exec setsid cttyhack sh"))
+        self.assertTrue(changes)
+
+
 class PackTests(unittest.TestCase):
     def test_update_run_initrd_rewrites_direct_path_and_creates_backup(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -172,7 +186,7 @@ class PackTests(unittest.TestCase):
             self.assertIn("-initrd packed-rootfs.cpio.gz", run_path.read_text())
             self.assertTrue((Path(tmp) / "run.sh.bak").exists())
 
-    def test_create_debug_run_copy_injects_nokaslr_gdbstub_and_keeps_original(self):
+    def test_create_debug_run_copy_preserves_kaslr_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             run_path = base / "run.sh"
@@ -186,7 +200,18 @@ class PackTests(unittest.TestCase):
             debug_text = debug_path.read_text()
             self.assertIn("-s", debug_text)
             self.assertIn("-S", debug_text)
-            self.assertIn('console=ttyS0 nokaslr', debug_text)
+            self.assertNotIn("nokaslr", debug_text)
+
+    def test_create_debug_run_copy_adds_nokaslr_when_requested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            run_path = base / "run.sh"
+            debug_path = base / ".kphelper-run-debug.sh"
+            run_path.write_text('qemu-system-x86_64 -append "console=ttyS0"\n')
+
+            create_debug_run_copy(run_path, debug_path, nokaslr=True)
+
+            self.assertIn("console=ttyS0 nokaslr", debug_path.read_text())
 
 
 class SymbolTests(unittest.TestCase):

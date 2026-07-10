@@ -1,3 +1,4 @@
+from kphelper.core.analysis import analysis_address_scope, resolve_analysis_run
 from kphelper.core.checksec import collect_checksec, run_checksec
 from kphelper.core.checksec_report import render_report
 from kphelper.core.errors import KphelperError
@@ -44,6 +45,11 @@ def register(subparsers):
         action="store_true",
         help="run static checksec and live probe together",
     )
+    parser.add_argument(
+        "--analysis",
+        action="store_true",
+        help="use the generated privileged analysis environment for live probes",
+    )
     add_guest_timeout_arguments(parser)
     parser.set_defaults(handler=handle)
     return parser
@@ -59,9 +65,16 @@ def _run_live(args, static_rootfs=None):
 
 def handle(args):
     color = not args.no_color
+    if args.analysis:
+        if not (args.live or args.all):
+            raise KphelperError("--analysis requires --live or --all")
+        args.run = str(resolve_analysis_run())
     if args.live:
         live_result = _run_live(args)
-        print(render_live_report(live_result, color=color))
+        report = render_live_report(live_result, color=color)
+        if args.analysis:
+            report += "\n[*] Analysis address scope: %s" % analysis_address_scope(args.run)
+        print(report)
         return 0
 
     if args.all:
@@ -87,7 +100,10 @@ def handle(args):
                 },
                 color=color,
             )
-        print(static_report + "\n\n" + live_report)
+        combined = static_report + "\n\n" + live_report
+        if args.analysis:
+            combined += "\n[*] Analysis address scope: %s" % analysis_address_scope(args.run)
+        print(combined)
         return 0
 
     print(run_checksec(args.run, args.cpio, args.root, color=color))

@@ -1,3 +1,4 @@
+from kphelper.core.analysis import analysis_address_scope, resolve_analysis_run
 from kphelper.core.checksec import detect_runsec
 from kphelper.core.errors import KphelperError
 from kphelper.core.guest import add_guest_timeout_arguments, timeouts_from_args
@@ -20,6 +21,11 @@ def register(subparsers):
     parser.add_argument("--file", help="use static vmlinux extraction instead of runtime mode")
     parser.add_argument("-s", "--symbol", action="append", dest="symbols", help="symbol to extract; repeatable")
     parser.add_argument("--run", default="run.sh", help="QEMU startup script, default: run.sh")
+    parser.add_argument(
+        "--analysis",
+        action="store_true",
+        help="collect symbols using the generated privileged analysis rootfs",
+    )
     parser.add_argument("--remote", nargs=2, metavar=("IP", "PORT"), help="probe an existing remote shell")
     add_guest_timeout_arguments(parser)
     parser.add_argument("--json", action="store_true", help="print JSON output")
@@ -67,10 +73,17 @@ def _runtime_symbols(args, names):
 
 def handle(args):
     names = tuple(args.symbols) if args.symbols else DEFAULT_SYMBOLS
+    if args.analysis:
+        if args.remote or args.file:
+            raise KphelperError("--analysis cannot be combined with --remote or --file")
+        args.run = str(resolve_analysis_run())
     if args.file:
         symbol_file, symbols = extract_symbols(args.file, names)
         kaslr = {"status": "Static only", "detail": "addresses are link-time values; runtime slide is not available"}
         print(render_symbols(symbol_file, symbols, names, as_json=args.json, kaslr=kaslr))
         return 0
-    print(_runtime_symbols(args, names))
+    output = _runtime_symbols(args, names)
+    if args.analysis and not args.json:
+        output += "\n[*] Analysis address scope: %s" % analysis_address_scope(args.run)
+    print(output)
     return 0

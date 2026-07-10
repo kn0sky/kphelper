@@ -5,6 +5,8 @@
 ## 已完成的基础重构
 
 - Guest 上传流程统一使用随机 marker 命令协议，不再依赖每个上传步骤匹配固定提示符。
+- Debug 默认保留原始 KASLR 配置，仅在显式传入 `--nokaslr` 时禁用 KASLR。
+- 支持生成独立的 root analysis rootfs 和启动脚本，并与 symbols/checksec 运行时采集整合。
 - initramfs 解包缓存加入源路径、文件大小和纳秒修改时间校验。
 - 禁止覆盖没有 kphelper marker 的非空解包目录。
 - initramfs 解包和打包启用管道失败传播。
@@ -77,7 +79,7 @@
 
 ### Rootfs 独立命令组
 
-提供 `rootfs extract`、`rootfs list`、`rootfs inject` 和 `rootfs repack`，复用安全目录和缓存机制，不再把所有 rootfs 操作绑定到 `pack`。
+已提供 `rootfs make-analysis`。后续增加 `rootfs extract`、`rootfs list`、`rootfs inject` 和 `rootfs repack`，复用安全目录和缓存机制，不再把所有 rootfs 操作绑定到 `pack`。
 
 ## 第三阶段：分析能力扩展
 

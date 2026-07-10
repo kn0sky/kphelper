@@ -16,6 +16,11 @@ def register(subparsers):
         nargs="?",
         help="debug symbol file passed to gdb, default: auto-detect vmlinux",
     )
+    parser.add_argument(
+        "--nokaslr",
+        action="store_true",
+        help="explicitly disable KASLR in the generated debug script",
+    )
     parser.set_defaults(handler=handle)
     return parser
 
@@ -27,8 +32,12 @@ def handle(args):
         symbol = str(found) if found else "vmlinux"
 
     build_only()
-    debug_run = create_debug_run_copy()
+    debug_run = create_debug_run_copy(nokaslr=args.nokaslr)
     log.success("generated debug run script: %s", debug_run)
+    if args.nokaslr:
+        log.warning("KASLR disabled in debug script by explicit request")
+    else:
+        log.info("preserved original kernel KASLR configuration")
 
     debugger = None
     try:

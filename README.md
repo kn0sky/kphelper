@@ -124,12 +124,13 @@ kphelper run
 
 ### `kphelper debug [symbol]`
 
-Generate a temporary debug copy of `run.sh`, inject `nokaslr -s -S`, compile `exp.c` if present, start that temporary script, prepare the target, then open KGDB in a tmux split.
+Generate a temporary debug copy of `run.sh`, preserve its original KASLR configuration, inject `-s -S`, compile `exp.c` if present, start that temporary script, prepare the target, then open KGDB in a tmux split. Pass `--nokaslr` only when you explicitly want the generated debug environment to disable KASLR.
 
 ```bash
 kphelper debug
 kphelper debug ./vmlinux
 kphelper debug ./module.ko
+kphelper debug --nokaslr
 ```
 
 The default symbol file is `vmlinux`.
@@ -255,6 +256,27 @@ qemu-system-x86_64 -append "$cmdline"
 ```
 
 In those cases `Unknown` means "not statically resolved", not necessarily disabled or absent.
+
+## Privileged analysis rootfs
+
+Create a separate local analysis image when the original guest drops privileges or restricts symbol information:
+
+```bash
+kphelper rootfs make-analysis
+kphelper rootfs make-analysis rootfs.cpio.gz
+```
+
+This creates `.kphelper/analysis-rootfs.cpio.gz` and `.kphelper/run-analysis.sh`. The original initramfs and `run.sh` are never modified. The generator preserves the original init and module loading flow where possible, removes common final privilege-drop commands, and configures `kptr_restrict` and `dmesg_restrict` before the final shell.
+
+Use the generated environment directly with runtime features:
+
+```bash
+kphelper symbols --analysis
+kphelper checksec --live --analysis
+kphelper checksec --all --analysis
+```
+
+The analysis image deliberately differs from the original privilege configuration and is intended only for local investigation. If the original command line enables KASLR, collected absolute addresses are valid for the current boot only. Module addresses can also depend on module load order even with `nokaslr`.
 
 ## Command Extension
 

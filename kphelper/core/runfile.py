@@ -54,14 +54,15 @@ def ensure_qemu_flag(text, flag):
     return text[:insert_at] + " " + flag + text[insert_at:]
 
 
-def create_debug_run_copy(run_path="run.sh", output=".kphelper-run-debug.sh"):
+def create_debug_run_copy(run_path="run.sh", output=".kphelper-run-debug.sh", nokaslr=False):
     run_path = Path(run_path)
     output = Path(output)
     if not run_path.exists():
         raise KphelperError("%s not found" % run_path)
 
     text = run_path.read_text(errors="replace")
-    text = ensure_append_token(text, "nokaslr")
+    if nokaslr:
+        text = ensure_append_token(text, "nokaslr")
     text = ensure_qemu_flag(text, "-s")
     text = ensure_qemu_flag(text, "-S")
     output.write_text(text)
