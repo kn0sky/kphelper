@@ -40,7 +40,7 @@ examples:
   kphelper checksec rootfs.cpio
   kphelper pack
   kphelper symbols
-  kphelper ksym
+  kphelper symbols --file ./vmlinux
   kphelper run
   kphelper debug
   kphelper debug ./vmlinux

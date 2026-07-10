@@ -1,2 +1,2 @@
-class KphelperError(RuntimeError):
+class KphelperError(Exception):
     pass

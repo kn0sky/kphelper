@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from .constants import PROMPTS, REMOTE_DIR
+from .constants import REMOTE_DIR
 from .pwn import process, remote
 
 

@@ -149,16 +149,22 @@ cat /sys/module/<module>/sections/.text
 add-symbol-file <module.ko> <base>
 ```
 
-### `kphelper symbols [vmlinux]`
+### `kphelper symbols`
 
-Extract useful fixed addresses from `vmlinux`, mainly for `nokaslr` challenges.
+Extract kernel symbols. Runtime extraction from the guest `/proc/kallsyms` is the default; use `--file` for static `vmlinux` extraction.
 
 ```bash
 kphelper symbols
-kphelper symbols ./vmlinux
+kphelper symbols --run ./run.sh
+kphelper symbols --remote 127.0.0.1 1337
+kphelper symbols --file ./vmlinux
 kphelper symbols -s commit_creds -s prepare_kernel_cred
 kphelper symbols --json
 ```
+
+Runtime mode waits for a verified guest shell prompt. `--boot-timeout` controls QEMU boot waiting and `--command-timeout` controls each guest command. Ensure QEMU uses serial stdio (`-nographic` or equivalent), does not run in the background, and does not include `-S` unless a debugger resumes the CPU.
+
+If a matching local `vmlinux` and a common anchor such as `_stext` are both available, runtime mode calculates and displays the KASLR slide. Otherwise it emphasizes the detected KASLR state and explains that the slide cannot be calculated.
 
 Default symbols:
 
@@ -166,31 +172,20 @@ Default symbols:
 commit_creds
 prepare_kernel_cred
 init_cred
+init_task
+modprobe_path
+core_pattern
+poweroff_cmd
 swapgs_restore_regs_and_return_to_usermode
+entry_SYSCALL_64_after_hwframe
+find_task_by_vpid
+switch_task_namespaces
+init_nsproxy
+kernel_read_file
+call_usermodehelper_exec
 ```
 
 Default output is C macro style for quick copy/paste into `exp.c`.
-
-### `kphelper ksym`
-
-Boot the guest once, read `/proc/kallsyms`, print selected symbol addresses, then close the session. This is useful when the challenge only gives `bzImage` but the runtime rootfs exposes kernel pointers.
-
-```bash
-kphelper ksym
-kphelper ksym -s commit_creds -s prepare_kernel_cred
-kphelper ksym --json
-kphelper ksym --remote 127.0.0.1 1337
-```
-
-Requirements:
-
-```text
-/proc is mounted or mountable
-/proc/kallsyms is readable
-/proc/sys/kernel/kptr_restrict is 0
-```
-
-If `kptr_restrict` is not `0`, `kphelper ksym` exits with a clear error instead of printing zero addresses.
 
 ### `kphelper remote <ip> <port>`
 
