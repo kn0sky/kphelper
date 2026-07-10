@@ -43,10 +43,14 @@ def kallsyms_grep_command(names):
 def extract_guest_ksyms(io, names=DEFAULT_SYMBOLS, timeouts=None):
     shell = GuestShell(io, timeouts=timeouts or GuestTimeouts())
     shell.run("test -r /proc/kallsyms || mount -t proc none /proc 2>/dev/null || true")
-    kptr_output, _status = shell.run("cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo unknown")
+    kptr_output, kptr_status = shell.run("cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo unknown")
     kptr = parse_kptr_value(kptr_output)
     if kptr is None:
-        raise KphelperError("cannot read /proc/sys/kernel/kptr_restrict")
+        detail = kptr_output.strip() or "no output"
+        raise KphelperError(
+            "cannot read /proc/sys/kernel/kptr_restrict "
+            "(status=%s, output=%r)" % (kptr_status, detail)
+        )
     if kptr != 0:
         raise KphelperError("/proc/kallsyms addresses are hidden: kptr_restrict=%d" % kptr)
     output, _status = shell.run(kallsyms_grep_command(names))

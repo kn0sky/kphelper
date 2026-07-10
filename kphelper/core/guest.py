@@ -81,4 +81,8 @@ class GuestShell:
         except (IndexError, ValueError):
             status = None
         output = data.rsplit(marker_prefix, 1)[0]
-        return output.decode(errors="replace"), status
+        text = output.decode(errors="replace")
+        lines = text.splitlines()
+        if lines and lines[0].strip() == command.strip():
+            lines = lines[1:]
+        return "\n".join(lines).strip(), status
