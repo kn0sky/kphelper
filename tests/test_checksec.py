@@ -1,8 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from kphelper.core.analysis import _patch_init_for_root, prepare_analysis_root
+from kphelper.core.analysis import _patch_init_for_root, _privileged_repack, _sudo_run, prepare_analysis_root
 from kphelper.core.checksec import (
     detect_runsec,
     detect_sysctl_write,
@@ -203,6 +204,30 @@ class AnalysisRootfsTests(unittest.TestCase):
             )
             self.assertFalse((init_d / "S99ctf.kphelper-original").exists())
             self.assertTrue(any("S99ctf" in change for change in changes))
+
+    @patch("kphelper.core.analysis.subprocess.run")
+    def test_sudo_run_elevates_the_complete_command(self, run):
+        _sudo_run(["bash", "-o", "pipefail", "-c", "cpio command"])
+
+        run.assert_called_once_with(
+            ["sudo", "bash", "-o", "pipefail", "-c", "cpio command"],
+            cwd=None,
+            check=True,
+        )
+
+    @patch("kphelper.core.analysis._sudo_run")
+    def test_privileged_repack_uses_null_delimited_newc_pipeline(self, sudo_run):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            root.mkdir()
+            output = Path(tmp) / "analysis.cpio.gz"
+
+            _privileged_repack(root, output)
+
+        arguments = sudo_run.call_args_list[0].args[0]
+        self.assertEqual(arguments[:5], ["bash", "-o", "pipefail", "-c", arguments[4]])
+        self.assertIn("find . -print0", arguments[4])
+        self.assertIn("--format=newc --null", arguments[4])
 
 
 class PackTests(unittest.TestCase):

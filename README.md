@@ -262,11 +262,13 @@ In those cases `Unknown` means "not statically resolved", not necessarily disabl
 Create a separate local analysis image when the original guest drops privileges or restricts symbol information:
 
 ```bash
-kphelper rootfs make-analysis
-kphelper rootfs make-analysis rootfs.cpio.gz
+kphelper rootfs make-analysis --sudo
+kphelper rootfs make-analysis rootfs.cpio.gz --sudo
 ```
 
-This creates `.kphelper/analysis-rootfs.cpio.gz` and `.kphelper/run-analysis.sh`. The original initramfs and `run.sh` are never modified. The generator preserves the original init and module loading flow where possible, removes common final privilege-drop commands, and configures `kptr_restrict` and `dmesg_restrict` before the final shell.
+`--sudo` runs only the extraction, target script installation, repacking, and required cleanup with elevated privileges so cpio ownership, permissions, and device nodes are preserved. The generated archive is returned to the invoking user. Running without `--sudo` remains available for initramfs images that contain no privileged metadata.
+
+This creates `.kphelper/analysis-rootfs.cpio.gz` and `.kphelper/run-analysis.sh`. The original initramfs and `run.sh` are never modified. The generator makes only the supported final shell identity change and does not place backup scripts in startup directories.
 
 Use the generated environment directly with runtime features:
 

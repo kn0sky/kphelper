@@ -20,6 +20,11 @@ def register(subparsers):
     make.add_argument("--root", default=DEFAULT_ANALYSIS_ROOT, help="temporary analysis root directory")
     make.add_argument("-o", "--output", default=DEFAULT_ANALYSIS_CPIO, help="analysis initramfs output")
     make.add_argument("--analysis-run", default=DEFAULT_ANALYSIS_RUN, help="generated analysis startup script")
+    make.add_argument(
+        "--sudo",
+        action="store_true",
+        help="preserve root ownership, permissions, and device nodes using sudo",
+    )
     make.set_defaults(handler=handle_make_analysis)
     return parser
 
@@ -31,6 +36,7 @@ def handle_make_analysis(args):
         root_dir=args.root,
         output=args.output,
         analysis_run=args.analysis_run,
+        privileged=args.sudo,
     )
     log.success("analysis rootfs: %s", environment.cpio_path)
     log.success("analysis run script: %s", environment.run_path)
