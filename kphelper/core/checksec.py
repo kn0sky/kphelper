@@ -7,6 +7,7 @@ from .cpio import unpack_cpio
 from .discovery import find_cpio
 from .errors import KphelperError
 from .formatting import DISABLED, ENABLED, UNKNOWN
+from .qemu import parse_qemu_run_text
 
 
 def read_text(path):
@@ -14,16 +15,11 @@ def read_text(path):
 
 
 def extract_cmdline(run_text):
-    matches = re.findall(r"-append\s+(['\"])(.*?)\1", run_text, flags=re.DOTALL)
-    if matches:
-        return " ".join(match[1] for match in matches)
-    match = re.search(r"-append\s+([^\n]+)", run_text)
-    return match.group(1).strip() if match else ""
+    return parse_qemu_run_text(run_text).cmdline
 
 
 def extract_initrd(run_text):
-    match = re.search(r"-(?:initrd|initramfs)\s+([^\s\\]+)", run_text)
-    return match.group(1).strip("'\"") if match else None
+    return parse_qemu_run_text(run_text).initrd
 
 
 def resolve_initrd_path(initrd, run_path):
@@ -51,8 +47,9 @@ def detect_runsec(run_path):
         result["run.sh"] = "Missing"
         return result
     text = read_text(run_path)
-    cmdline = extract_cmdline(text)
-    cpu_args = " ".join(re.findall(r"-cpu\s+([^\s\\]+)", text))
+    config = parse_qemu_run_text(text, run_path)
+    cmdline = config.cmdline
+    cpu_args = config.cpu
     result["cmdline"] = cmdline or UNKNOWN
     if "nokaslr" in cmdline:
         result["KASLR"] = DISABLED
@@ -70,8 +67,8 @@ def detect_runsec(run_path):
         result["SMAP"] = DISABLED
     elif has_any(cpu_args, ["+smap", "smap"]):
         result["SMAP"] = ENABLED
-    result["KGDB"] = ENABLED if re.search(r"(^|\s)(-s|-S)(\s|$)", text) or "-gdb" in text else DISABLED
-    initrd = extract_initrd(text)
+    result["KGDB"] = ENABLED if config.gdb_enabled else DISABLED
+    initrd = config.initrd
     if initrd:
         result["Initrd"] = initrd
     return result

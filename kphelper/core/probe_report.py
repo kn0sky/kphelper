@@ -1,3 +1,4 @@
+from .findings import Finding
 from .formatting import BOLD, BLUE, DIM, GREEN, MAGENTA, RED, UNKNOWN, YELLOW, colorize
 
 
@@ -10,9 +11,10 @@ STATUS_COLORS = {
 
 
 def live_status_line(name, result, color=True):
-    status = result.get("status", UNKNOWN)
-    value = result.get("value")
-    detail = result.get("detail")
+    result = Finding.from_mapping(result)
+    status = result.status
+    value = result.value
+    detail = result.detail
     display = f"{status}: {value}" if value is not None else status
     colored_value = colorize(display, STATUS_COLORS.get(status, BLUE), color)
     label = colorize(f"{name:<18}", BOLD, color)

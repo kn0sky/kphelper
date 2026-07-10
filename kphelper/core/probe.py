@@ -1,5 +1,6 @@
 import re
 
+from .findings import Finding
 from .formatting import UNKNOWN
 from .guest import GuestShell, GuestTimeouts
 from .ksym import parse_kallsyms, parse_kptr_value
@@ -12,13 +13,8 @@ READABLE = "Readable"
 HIDDEN = "Hidden"
 
 
-def _result(status, detail=None, value=None):
-    result = {"status": status}
-    if detail:
-        result["detail"] = detail
-    if value is not None:
-        result["value"] = value
-    return result
+def _result(status, detail=None, value=None, source="runtime"):
+    return Finding(status=status, detail=detail, value=value, source=source)
 
 
 def _known_static_value(static_rootfs, name):

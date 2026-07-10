@@ -74,9 +74,11 @@ def repack_cpio(root_dir, output):
     cmd_output = output_path.resolve()
     cmd = "find . | cpio -o -H newc --quiet | gzip -9 > %s" % sh_quote(str(cmd_output))
     try:
-        subprocess.run(cmd, shell=True, cwd=root_dir, check=True)
-    except subprocess.CalledProcessError as e:
-        raise KphelperError("failed to repack %s, exit code: %d" % (output_path, e.returncode)) from e
+        subprocess.run(["bash", "-o", "pipefail", "-c", cmd], cwd=root_dir, check=True)
+    except FileNotFoundError as error:
+        raise KphelperError("bash not found; initramfs operations require Linux/WSL") from error
+    except subprocess.CalledProcessError as error:
+        raise KphelperError("failed to repack %s, exit code: %d" % (output_path, error.returncode)) from error
     log.success("repacked initramfs -> %s", output_path)
     return output_path
 

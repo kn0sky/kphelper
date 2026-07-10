@@ -1,6 +1,7 @@
 from kphelper.core.checksec import collect_checksec, run_checksec
 from kphelper.core.checksec_report import render_report
 from kphelper.core.errors import KphelperError
+from kphelper.core.findings import Finding
 from kphelper.core.guest import add_guest_timeout_arguments, timeouts_from_args
 from kphelper.core.probe import probe_guest_runtime
 from kphelper.core.probe_report import render_live_report
@@ -72,11 +73,17 @@ def handle(args):
         except KphelperError as error:
             live_report = render_live_report(
                 {
-                    "User ID": {"status": "Skipped", "detail": str(error)},
-                    "kptr_restrict": {"status": "Skipped", "detail": "live probe unavailable"},
-                    "dmesg_restrict": {"status": "Skipped", "detail": "live probe unavailable"},
-                    "kallsyms": {"status": "Skipped", "detail": "live probe unavailable"},
-                    "Module base leak": {"status": "Skipped", "detail": "live probe unavailable"},
+                    name: Finding(
+                        "Skipped",
+                        detail=str(error) if name == "User ID" else "live probe unavailable",
+                    )
+                    for name in [
+                        "User ID",
+                        "kptr_restrict",
+                        "dmesg_restrict",
+                        "kallsyms",
+                        "Module base leak",
+                    ]
                 },
                 color=color,
             )

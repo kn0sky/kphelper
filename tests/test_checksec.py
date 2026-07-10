@@ -12,6 +12,7 @@ from kphelper.core.checksec import (
 )
 from kphelper.core.checksec_report import render_report
 from kphelper.core.probe_report import render_live_report
+from kphelper.core.qemu import parse_qemu_run_text
 from kphelper.core.discovery import find_cpio, find_vmlinux
 from kphelper.core.ksym import parse_kallsyms, parse_kptr_value
 from kphelper.core.runfile import create_debug_run_copy, update_run_initrd
@@ -33,6 +34,22 @@ class ChecksecParsingTests(unittest.TestCase):
         run_sh = 'qemu-system-x86_64 -initrd ./dist/rootfs.cpio.gz -append "console=ttyS0"\n'
 
         self.assertEqual(extract_initrd(run_sh), "./dist/rootfs.cpio.gz")
+
+    def test_qemu_parser_does_not_treat_following_options_as_cmdline(self):
+        config = parse_qemu_run_text(
+            "qemu-system-x86_64 -append console=ttyS0 -initrd rootfs.cpio -s\n"
+        )
+
+        self.assertEqual(config.cmdline, "console=ttyS0")
+        self.assertEqual(config.initrd, "rootfs.cpio")
+        self.assertTrue(config.gdb_enabled)
+
+    def test_qemu_parser_ignores_flags_outside_qemu_command(self):
+        config = parse_qemu_run_text(
+            "gcc -s -o exp exp.c\nqemu-system-x86_64 -append 'console=ttyS0'\n"
+        )
+
+        self.assertFalse(config.gdb_enabled)
 
     def test_detect_runsec_common_disabled_settings(self):
         with tempfile.TemporaryDirectory() as tmp:
