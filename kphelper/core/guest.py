@@ -31,10 +31,7 @@ def add_guest_timeout_arguments(parser):
 
 
 def timeouts_from_args(args):
-    return GuestTimeouts(
-        boot=args.boot_timeout,
-        command=args.command_timeout,
-    )
+    return GuestTimeouts(boot=args.boot_timeout, command=args.command_timeout)
 
 
 class GuestShell:
@@ -67,15 +64,21 @@ class GuestShell:
     def run(self, command):
         self.wait_ready()
         marker = "__KPHELPER_%s__" % uuid.uuid4().hex
-        self.io.sendline(("%s; printf '\\n%s:%%s\\n' $?" % (command, marker)).encode())
-        data = self.io.recvuntil((marker + ":").encode(), timeout=self.timeouts.command) or b""
-        if (marker + ":").encode() not in data:
-            raise KphelperError("guest command timed out after %d seconds: %s" % (self.timeouts.command, command))
-        status_line = self.io.recvline(timeout=self.timeouts.command) or b""
-        self._receive_prompt(self.timeouts.command)
-        output = data.rsplit((marker + ":").encode(), 1)[0]
+        marker_prefix = (marker + ":").encode()
+        self.io.sendline(("%s; printf '%s%%s\\n' $?" % (command, marker + ":")).encode())
+        data = self.io.recvuntil(marker_prefix, timeout=self.timeouts.command) or b""
+        if marker_prefix not in data:
+            raise KphelperError(
+                "guest command timed out after %d seconds: %s"
+                % (self.timeouts.command, command)
+            )
+        status_data = self.io.recvuntil(PROMPTS, timeout=self.timeouts.command) or b""
+        if not status_data.endswith(PROMPTS):
+            raise KphelperError("guest command completed without returning a shell prompt")
+        status_text = status_data[:-2].decode(errors="replace").strip()
         try:
-            status = int(status_line.strip().split()[0])
+            status = int(status_text.splitlines()[0])
         except (IndexError, ValueError):
             status = None
+        output = data.rsplit(marker_prefix, 1)[0]
         return output.decode(errors="replace"), status
