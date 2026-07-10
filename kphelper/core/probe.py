@@ -1,7 +1,8 @@
 import re
 
 from .formatting import UNKNOWN
-from .ksym import GuestShell, parse_kallsyms, parse_kptr_value
+from .guest import GuestShell, GuestTimeouts
+from .ksym import parse_kallsyms, parse_kptr_value
 from .session import managed_session, local_target, remote_target
 from .symbols import DEFAULT_SYMBOLS
 
@@ -67,8 +68,8 @@ def _probe_module_base(shell):
     return _result(READABLE, detail=output.strip().splitlines()[-1])
 
 
-def probe_runtime(io, static_rootfs=None, boot_timeout=30, command_timeout=8, names=DEFAULT_SYMBOLS):
-    shell = GuestShell(io, timeout=command_timeout, boot_timeout=boot_timeout)
+def probe_runtime(io, static_rootfs=None, timeouts=None, names=DEFAULT_SYMBOLS):
+    shell = GuestShell(io, timeouts=timeouts or GuestTimeouts())
     shell.wait_ready()
 
     uid_output, uid_status = shell.run("id -u 2>/dev/null")
@@ -89,23 +90,11 @@ def probe_runtime(io, static_rootfs=None, boot_timeout=30, command_timeout=8, na
     }
 
 
-def probe_guest_runtime(run_path="./run.sh", static_rootfs=None, boot_timeout=30, command_timeout=8, names=DEFAULT_SYMBOLS):
+def probe_guest_runtime(run_path="./run.sh", static_rootfs=None, timeouts=None, names=DEFAULT_SYMBOLS):
     with managed_session(local_target, run_path) as io:
-        return probe_runtime(
-            io,
-            static_rootfs=static_rootfs,
-            boot_timeout=boot_timeout,
-            command_timeout=command_timeout,
-            names=names,
-        )
+        return probe_runtime(io, static_rootfs=static_rootfs, timeouts=timeouts, names=names)
 
 
-def probe_remote_runtime(ip, port, static_rootfs=None, boot_timeout=30, command_timeout=8, names=DEFAULT_SYMBOLS):
+def probe_remote_runtime(ip, port, static_rootfs=None, timeouts=None, names=DEFAULT_SYMBOLS):
     with managed_session(remote_target, ip, port) as io:
-        return probe_runtime(
-            io,
-            static_rootfs=static_rootfs,
-            boot_timeout=boot_timeout,
-            command_timeout=command_timeout,
-            names=names,
-        )
+        return probe_runtime(io, static_rootfs=static_rootfs, timeouts=timeouts, names=names)

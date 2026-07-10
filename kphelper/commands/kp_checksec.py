@@ -1,6 +1,7 @@
 from kphelper.core.checksec import collect_checksec, run_checksec
 from kphelper.core.checksec_report import render_report
 from kphelper.core.errors import KphelperError
+from kphelper.core.guest import add_guest_timeout_arguments, timeouts_from_args
 from kphelper.core.probe import probe_guest_runtime
 from kphelper.core.probe_report import render_live_report
 
@@ -42,18 +43,7 @@ def register(subparsers):
         action="store_true",
         help="run static checksec and live probe together",
     )
-    parser.add_argument(
-        "--boot-timeout",
-        type=int,
-        default=30,
-        help="seconds to wait for the guest shell prompt, default: 30",
-    )
-    parser.add_argument(
-        "--command-timeout",
-        type=int,
-        default=8,
-        help="seconds to wait for each guest command, default: 8",
-    )
+    add_guest_timeout_arguments(parser)
     parser.set_defaults(handler=handle)
     return parser
 
@@ -62,8 +52,7 @@ def _run_live(args, static_rootfs=None):
     return probe_guest_runtime(
         args.run,
         static_rootfs=static_rootfs,
-        boot_timeout=args.boot_timeout,
-        command_timeout=args.command_timeout,
+        timeouts=timeouts_from_args(args),
     )
 
 

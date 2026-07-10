@@ -1,55 +1,13 @@
 import re
-import uuid
 
-from .constants import PROMPTS
 from .errors import KphelperError
+from .guest import GuestShell, GuestTimeouts
 from .symbols import DEFAULT_SYMBOLS
 
 
 def validate_symbol_name(name):
     if not re.fullmatch(r"[A-Za-z0-9_.$]+", name):
         raise KphelperError("unsafe symbol name: %s" % name)
-
-
-class GuestShell:
-    def __init__(self, io, timeout=8, boot_timeout=None):
-        self.io = io
-        self.timeout = timeout
-        self.boot_timeout = boot_timeout if boot_timeout is not None else timeout
-        self.ready = False
-
-    def wait_ready(self):
-        if self.ready:
-            return
-        prompt_data = self.io.recvuntil(PROMPTS, timeout=self.boot_timeout) or b""
-        if not prompt_data.endswith(PROMPTS):
-            raise KphelperError(
-                "guest shell prompt not reached within %d seconds; ensure QEMU uses serial stdio and does not boot with -S"
-                % self.boot_timeout
-            )
-        marker = "__KPHELPER_READY_%s__" % uuid.uuid4().hex
-        self.io.sendline(("echo " + marker).encode())
-        data = self.io.recvuntil(marker.encode(), timeout=self.timeout) or b""
-        if marker.encode() not in data:
-            raise KphelperError("guest shell did not execute readiness probe")
-        self.io.recvuntil(PROMPTS, timeout=self.timeout)
-        self.ready = True
-
-    def run(self, command):
-        self.wait_ready()
-        marker = "__KPHELPER_%s__" % uuid.uuid4().hex
-        self.io.sendline(("%s; printf '\\n%s:%%s\\n' $?" % (command, marker)).encode())
-        data = self.io.recvuntil((marker + ":").encode(), timeout=self.timeout) or b""
-        if (marker + ":").encode() not in data:
-            raise KphelperError("guest command timed out: %s" % command)
-        status_line = self.io.recvline(timeout=self.timeout) or b""
-        self.io.recvuntil(PROMPTS, timeout=self.timeout)
-        output = data.rsplit((marker + ":").encode(), 1)[0]
-        try:
-            status = int(status_line.strip().split()[0])
-        except (IndexError, ValueError):
-            status = None
-        return output.decode(errors="replace"), status
 
 
 def parse_kptr_value(output):
@@ -82,8 +40,8 @@ def kallsyms_grep_command(names):
     return "for s in %s; do grep \" $s$\" /proc/kallsyms 2>/dev/null; done" % " ".join(names)
 
 
-def extract_guest_ksyms(io, names=DEFAULT_SYMBOLS, timeout=8, boot_timeout=30):
-    shell = GuestShell(io, timeout=timeout, boot_timeout=boot_timeout)
+def extract_guest_ksyms(io, names=DEFAULT_SYMBOLS, timeouts=None):
+    shell = GuestShell(io, timeouts=timeouts or GuestTimeouts())
     shell.run("test -r /proc/kallsyms || mount -t proc none /proc 2>/dev/null || true")
     kptr_output, _status = shell.run("cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo unknown")
     kptr = parse_kptr_value(kptr_output)

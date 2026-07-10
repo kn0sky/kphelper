@@ -1,5 +1,6 @@
 from kphelper.core.checksec import detect_runsec
 from kphelper.core.errors import KphelperError
+from kphelper.core.guest import add_guest_timeout_arguments, timeouts_from_args
 from kphelper.core.ksym import extract_guest_ksyms
 from kphelper.core.session import managed_session, local_target, remote_target
 from kphelper.core.symbols import (
@@ -20,8 +21,7 @@ def register(subparsers):
     parser.add_argument("-s", "--symbol", action="append", dest="symbols", help="symbol to extract; repeatable")
     parser.add_argument("--run", default="run.sh", help="QEMU startup script, default: run.sh")
     parser.add_argument("--remote", nargs=2, metavar=("IP", "PORT"), help="probe an existing remote shell")
-    parser.add_argument("--boot-timeout", type=int, default=30, help="guest boot timeout, default: 30")
-    parser.add_argument("--command-timeout", type=int, default=8, help="guest command timeout, default: 8")
+    add_guest_timeout_arguments(parser)
     parser.add_argument("--json", action="store_true", help="print JSON output")
     parser.set_defaults(handler=handle)
     return parser
@@ -43,8 +43,7 @@ def _runtime_symbols(args, names):
         runtime = extract_guest_ksyms(
             io,
             requested,
-            timeout=args.command_timeout,
-            boot_timeout=args.boot_timeout,
+            timeouts=timeouts_from_args(args),
         )
 
     kaslr = {"status": "Unknown", "detail": "runtime symbols collected; no vmlinux available to calculate slide"}
