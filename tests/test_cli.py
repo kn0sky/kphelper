@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from kphelper.cli import build_parser
+from kphelper.commands.kp_checksec import handle as handle_checksec
 from kphelper.commands.kp_debug import handle as handle_debug
 from kphelper.commands.kp_symbols import handle as handle_symbols
 from kphelper.core.errors import KphelperError
@@ -27,6 +28,30 @@ class CliTests(unittest.TestCase):
 
         self.assertNotIn("example", subparsers.choices)
         self.assertIn("checksec", subparsers.choices)
+
+    def test_top_level_help_examples_cover_core_workflows(self):
+        help_text = build_parser().format_help()
+
+        for example in [
+            "kphelper init",
+            "kphelper checksec --all --analysis",
+            "kphelper rootfs extract rootfs.cpio.gz",
+            "kphelper rootfs repack .kphelper/rootfs",
+            "kphelper pack rootfs.cpio.gz",
+            "kphelper symbols --refresh",
+            "kphelper debug ./vmlinux --nokaslr",
+            "kphelper remote 127.0.0.1 1337",
+        ]:
+            self.assertIn(example, help_text)
+
+    def test_rootfs_extract_and_repack_actions_are_exposed(self):
+        parser = build_parser()
+
+        extract = parser.parse_args(["rootfs", "extract", "rootfs.cpio"])
+        repack = parser.parse_args(["rootfs", "repack"])
+
+        self.assertEqual(extract.cpio, "rootfs.cpio")
+        self.assertEqual(repack.root, ".kphelper/rootfs")
 
     def test_static_checksec_runs_without_site_packages(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -47,6 +72,96 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Kernel checksec", result.stdout)
         self.assertIn("KASLR", result.stdout)
+
+    @patch("kphelper.commands.kp_checksec.analysis_address_scope", return_value="current boot only")
+    @patch("kphelper.commands.kp_checksec._render_and_cache_live", return_value="live report")
+    @patch("kphelper.commands.kp_checksec._run_live")
+    @patch("kphelper.commands.kp_checksec.create_analysis_environment")
+    @patch("builtins.print")
+    def test_checksec_live_prepares_and_uses_analysis_environment(
+        self,
+        print_output,
+        create_analysis,
+        _run_live,
+        _render_live,
+        _address_scope,
+    ):
+        create_analysis.return_value = SimpleNamespace(
+            cpio_path=Path(".kphelper/analysis-rootfs.cpio.gz"),
+            run_path=Path(".kphelper/run-analysis.sh"),
+        )
+        args = SimpleNamespace(
+            run="run.sh",
+            cpio="rootfs.cpio",
+            root=".kphelper/checksec-root",
+            no_color=True,
+            live=True,
+            all=False,
+            analysis=True,
+            boot_timeout=30,
+            command_timeout=8,
+        )
+
+        handle_checksec(args)
+
+        create_analysis.assert_called_once_with(
+            cpio_path="rootfs.cpio",
+            run_path="run.sh",
+        )
+        self.assertEqual(args.run, ".kphelper/run-analysis.sh")
+        print_output.assert_any_call("live report\n[*] Analysis address scope: current boot only")
+
+    def test_checksec_all_uses_generated_analysis_run_and_cpio(self):
+        environment = SimpleNamespace(
+            cpio_path=Path(".kphelper/analysis-rootfs.cpio.gz"),
+            run_path=Path(".kphelper/run-analysis.sh"),
+        )
+        args = SimpleNamespace(
+            run="run.sh",
+            cpio="rootfs.cpio",
+            root=".kphelper/checksec-root",
+            no_color=True,
+            live=False,
+            all=True,
+            analysis=True,
+            boot_timeout=30,
+            command_timeout=8,
+        )
+        with ExitStack() as stack:
+            create_analysis = stack.enter_context(
+                patch(
+                    "kphelper.commands.kp_checksec.create_analysis_environment",
+                    return_value=environment,
+                )
+            )
+            collect = stack.enter_context(
+                patch("kphelper.commands.kp_checksec.collect_checksec", return_value=({}, None))
+            )
+            stack.enter_context(
+                patch("kphelper.commands.kp_checksec.render_report", return_value="static report")
+            )
+            stack.enter_context(
+                patch("kphelper.commands.kp_checksec._run_live", side_effect=KphelperError("offline"))
+            )
+            stack.enter_context(
+                patch("kphelper.commands.kp_checksec.render_live_report", return_value="live report")
+            )
+            stack.enter_context(
+                patch("kphelper.commands.kp_checksec.analysis_address_scope", return_value="current boot only")
+            )
+            stack.enter_context(patch("builtins.print"))
+
+            handle_checksec(args)
+
+        create_analysis.assert_called_once_with(
+            cpio_path="rootfs.cpio",
+            run_path="run.sh",
+        )
+        collect.assert_called_once_with(
+            ".kphelper/run-analysis.sh",
+            ".kphelper/analysis-rootfs.cpio.gz",
+            ".kphelper/checksec-root",
+        )
 
     @patch("kphelper.core.session.process")
     def test_local_target_rejects_missing_run_script(self, process):

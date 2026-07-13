@@ -11,14 +11,14 @@ STATUS_COLORS = {
 }
 
 
-def live_status_line(name, result, color=True):
+def live_status_line(name, result, color=True, label_width=18):
     result = Finding.from_mapping(result)
     status = result.status
     value = result.value
     detail = result.detail
     display = f"{status}: {value}" if value is not None else status
     colored_value = colorize(display, STATUS_COLORS.get(status, BLUE), color)
-    label = colorize(f"{name:<18}", BOLD, color)
+    label = colorize(f"{name:<{label_width}}", BOLD, color)
     if detail:
         return f"    {label}: {colored_value} {colorize(f'({detail})', DIM, color)}"
     return f"    {label}: {colored_value}"
@@ -36,13 +36,15 @@ def render_live_report(live_result, color=True, kaslr=None):
     if symbols:
         lines.append("")
         lines.append(colorize("[*] Live symbols", MAGENTA + BOLD, color))
-        for name in DEFAULT_SYMBOLS:
-            if name in symbols:
-                lines.append(live_status_line(
-                    name,
-                    {"status": "Readable", "value": f"0x{symbols[name]:x}"},
-                    color=color,
-                ))
+        symbol_names = [name for name in DEFAULT_SYMBOLS if name in symbols]
+        label_width = max(18, *(len(name) for name in symbol_names))
+        for name in symbol_names:
+            lines.append(live_status_line(
+                name,
+                {"status": "Readable", "value": f"0x{symbols[name]:x}"},
+                color=color,
+                label_width=label_width,
+            ))
 
     lines.append("")
     lines.append(colorize("[*] C assignments", MAGENTA + BOLD, color))

@@ -1,9 +1,6 @@
 import json
-import os
 import re
 import shutil
-import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,12 +42,10 @@ def _startup_files(root_dir):
             candidates.extend(sorted(path for path in init_d.iterdir() if path.is_file()))
         return [path for path in candidates if path.is_file()]
     except PermissionError as error:
-        raise KphelperError(
-            "cannot read privileged analysis root; rerun the command with sudo access"
-        ) from error
+        raise KphelperError("cannot read analysis root: %s" % root_dir) from error
 
 
-def prepare_analysis_root(root_dir, install_file=None):
+def prepare_analysis_root(root_dir):
     files = _startup_files(root_dir)
     if not files:
         raise KphelperError("analysis rootfs has no supported startup scripts")
@@ -61,10 +56,7 @@ def prepare_analysis_root(root_dir, install_file=None):
         patched, file_changes = _patch_init_for_root(original)
         if patched == original:
             continue
-        if install_file:
-            install_file(path, patched)
-        else:
-            path.write_text(patched, encoding="utf-8")
+        path.write_text(patched, encoding="utf-8")
         changes.extend("%s: %s" % (path.relative_to(root_dir), change) for change in file_changes)
 
     if not changes:
@@ -74,103 +66,32 @@ def prepare_analysis_root(root_dir, install_file=None):
     return changes
 
 
-def _sudo_run(arguments, cwd=None):
-    try:
-        subprocess.run(["sudo"] + list(arguments), cwd=cwd, check=True)
-    except FileNotFoundError as error:
-        raise KphelperError("sudo not found; privileged analysis requires sudo") from error
-    except subprocess.CalledProcessError as error:
-        raise KphelperError("privileged analysis command failed, exit code: %d" % error.returncode) from error
-
-
-def _validate_analysis_root(root_dir):
-    root_dir = Path(root_dir)
-    resolved = root_dir.resolve()
-    cwd = Path.cwd().resolve()
-    if resolved in {cwd, cwd.parent, Path(resolved.anchor)} or root_dir.name in {"", ".", ".."}:
-        raise KphelperError("refusing unsafe analysis root: %s" % root_dir)
-    return root_dir
-
-
-def _privileged_unpack(source, root_dir):
-    from .cpio import cpio_command
-
-    root_dir = _validate_analysis_root(root_dir)
-    _sudo_run(["-v"])
-    if root_dir.exists():
-        _sudo_run(["rm", "-rf", "--", str(root_dir.resolve())])
-    root_dir.mkdir(parents=True)
-    _sudo_run(["bash", "-o", "pipefail", "-c", cpio_command(Path(source).resolve())], cwd=root_dir)
-    return root_dir
-
-
-def _privileged_installer(path, content):
-    mode = path.stat().st_mode & 0o7777
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as temporary:
-        temporary.write(content)
-        temporary_path = Path(temporary.name)
-    try:
-        _sudo_run(["install", "-m", "%o" % mode, "--", str(temporary_path), str(path.resolve())])
-    finally:
-        temporary_path.unlink(missing_ok=True)
-
-
-def _privileged_repack(root_dir, output):
-    output = Path(output).resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    command = "find . -print0 | cpio -o --format=newc --null --quiet | gzip -9 > \"$1\""
-    _sudo_run(["bash", "-o", "pipefail", "-c", command, "bash", str(output)], cwd=root_dir)
-    if hasattr(os, "getuid") and hasattr(os, "getgid"):
-        _sudo_run(["chown", "%d:%d" % (os.getuid(), os.getgid()), "--", str(output)])
-    return output
-
-
-def _release_privileged_root(root_dir):
-    if hasattr(os, "getuid") and hasattr(os, "getgid"):
-        _sudo_run([
-            "chown",
-            "-R",
-            "%d:%d" % (os.getuid(), os.getgid()),
-            "--",
-            str(Path(root_dir).resolve()),
-        ])
-
-
 def create_analysis_environment(
     cpio_path=None,
     run_path="run.sh",
     root_dir=DEFAULT_ANALYSIS_ROOT,
     output=DEFAULT_ANALYSIS_CPIO,
     analysis_run=DEFAULT_ANALYSIS_RUN,
-    privileged=False,
 ):
     from .pack import ensure_clean_pack_root, repack_cpio, select_cpio
 
     source = select_cpio(run_path, cpio_path)
-    if privileged:
-        root_dir = _privileged_unpack(source, root_dir)
-        changes = prepare_analysis_root(root_dir, install_file=_privileged_installer)
-        output = _privileged_repack(root_dir, output)
-        _release_privileged_root(root_dir)
-        metadata_preservation = "sudo"
-    else:
-        with preserved_metadata_state() as fakeroot_state:
-            root_dir = ensure_clean_pack_root(root_dir)
-            unpack_cpio(
-                source,
-                root_dir,
-                reuse_existing=False,
-                fakeroot_state=fakeroot_state,
-            )
-            (Path(root_dir) / CPIO_MARKER).unlink(missing_ok=True)
-            changes = prepare_analysis_root(root_dir)
-            output = repack_cpio(root_dir, output, fakeroot_state=fakeroot_state)
-        metadata_preservation = "fakeroot" if fakeroot_state is not None else "root"
+    with preserved_metadata_state() as fakeroot_state:
+        root_dir = ensure_clean_pack_root(root_dir)
+        unpack_cpio(
+            source,
+            root_dir,
+            reuse_existing=False,
+            fakeroot_state=fakeroot_state,
+        )
+        (Path(root_dir) / CPIO_MARKER).unlink(missing_ok=True)
+        changes = prepare_analysis_root(root_dir)
+        output = repack_cpio(root_dir, output, fakeroot_state=fakeroot_state)
+    metadata_preservation = "fakeroot" if fakeroot_state is not None else "root"
 
     manifest = {
         "source_cpio": str(Path(source).resolve()),
         "source_run": str(Path(run_path).resolve()),
-        "privileged": privileged,
         "metadata_preservation": metadata_preservation,
         "modifications": changes,
         "warning": "analysis environment only; runtime addresses may be boot-specific when KASLR is enabled",

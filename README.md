@@ -232,9 +232,17 @@ kphelper checksec rootfs.cpio.gz
 kphelper checksec -r ./run.sh rootfs.cpio --no-color
 kphelper checksec --live
 kphelper checksec --all --boot-timeout 30
+kphelper checksec --all --analysis
 ```
 
 The default mode performs static analysis only. `--live` starts `run.sh` and performs runtime probes only. `--all` always renders the static report and then appends live results; if no interactive guest shell is reached, the live section is marked `Skipped` instead of discarding the static report. Use `--boot-timeout` and `--command-timeout` for slow guests.
+
+Add `--analysis` to create a separate analysis rootfs with fakeroot before `--live` or `--all`:
+
+```bash
+kphelper checksec --live --analysis
+kphelper checksec --all --analysis
+```
 
 Live probes only supplement information that static analysis cannot confirm. For example, statically detected `kptr_restrict` and `dmesg_restrict` values are reused rather than read again. Permission-dependent probes are reported as `Skipped` or `Hidden` instead of aborting the complete report.
 
@@ -256,23 +264,44 @@ qemu-system-x86_64 -append "$cmdline"
 
 In those cases `Unknown` means "not statically resolved", not necessarily disabled or absent.
 
-## Privileged analysis rootfs
+## Rootfs extraction and repacking
+
+Extract an initramfs into a workspace without changing its contents:
+
+```bash
+kphelper rootfs extract
+kphelper rootfs extract rootfs.cpio.gz
+kphelper rootfs extract rootfs.cpio.gz --root .kphelper/rootfs
+```
+
+The default extraction directory is `.kphelper/rootfs`. The command stores fakeroot metadata beside it in `.kphelper/rootfs.fakeroot-state`, preserving ownership and device metadata across separate commands.
+
+Repack the extracted tree without injecting files or rewriting `run.sh`:
+
+```bash
+kphelper rootfs repack
+kphelper rootfs repack .kphelper/rootfs -o .kphelper/rootfs-repacked.cpio.gz
+```
+
+The extraction workspace contains only archive entries; fakeroot state is stored beside it. The internal `.kphelper-cpio-source` cache marker is also excluded defensively during repacking. Any edits made manually between extraction and repacking are included; kphelper applies no content changes by default. Repacking preserves paths, regular-file contents, modes, ownership, and device metadata, while archive ordering, compression, and some directory timestamps may differ.
+
+## Analysis rootfs
 
 Create a separate local analysis image when the original guest drops privileges or restricts symbol information:
 
 ```bash
-kphelper rootfs make-analysis --sudo
-kphelper rootfs make-analysis rootfs.cpio.gz --sudo
+kphelper rootfs make-analysis
+kphelper rootfs make-analysis rootfs.cpio.gz
 ```
 
-The default flow uses `fakeroot` to preserve cpio ownership and device metadata without requesting a password. `--sudo` is an alternative for environments without `fakeroot`; it elevates only extraction, target script installation, repacking, and required cleanup. The generated archive is returned to the invoking user.
+The flow uses `fakeroot` to preserve cpio ownership and device metadata without requesting a password. Set `FAKEROOTDONTTRYCHOWN=1` for fakeroot subprocesses so the workflow also operates inside user namespaces where real ownership changes are rejected.
 
 This creates `.kphelper/analysis-rootfs.cpio.gz` and `.kphelper/run-analysis.sh`. The original initramfs and `run.sh` are never modified. The generator makes only the supported final shell identity change and does not place backup scripts in startup directories.
 
-Use the generated environment directly with runtime features:
+`checksec --live/--all` creates the environment automatically when passed `--analysis`. The standalone command remains available when only the generated files are needed:
 
 ```bash
-kphelper symbols --analysis
+kphelper symbols --analysis --refresh
 kphelper checksec --live --analysis
 kphelper checksec --all --analysis
 ```

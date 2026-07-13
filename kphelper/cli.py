@@ -11,7 +11,8 @@ HELP_EPILOG = """\
 current directory requirements:
   run/debug mode:
     required: ./run.sh
-    debug auto-generates .kphelper-run-debug.sh with nokaslr -s -S
+    debug auto-generates .kphelper-run-debug.sh with -s -S
+    pass --nokaslr to explicitly disable KASLR in the debug copy
     debug also requires: symbol file
     default debug symbol file: ./vmlinux
 
@@ -29,17 +30,32 @@ target shell prompt:
   supported prompts: "$ " and "# "
 
 examples:
-  kphelper init
-  kphelper checksec
-  kphelper checksec rootfs.cpio
-  kphelper pack
-  kphelper symbols
-  kphelper symbols --file ./vmlinux
-  kphelper run
-  kphelper debug
-  kphelper debug ./vmlinux
-  kphelper debug ./module.ko
-  kphelper remote 127.0.0.1 1337
+  project setup:
+    kphelper init
+
+  security inspection:
+    kphelper checksec
+    kphelper checksec rootfs.cpio.gz --no-color
+    kphelper checksec --live
+    kphelper checksec --all --analysis
+
+  rootfs workflows:
+    kphelper rootfs extract rootfs.cpio.gz --root .kphelper/rootfs
+    kphelper rootfs repack .kphelper/rootfs -o repacked.cpio.gz
+    kphelper rootfs make-analysis
+    kphelper pack rootfs.cpio.gz -o packed-rootfs.cpio.gz
+
+  kernel symbols:
+    kphelper symbols
+    kphelper symbols --refresh
+    kphelper symbols --file ./vmlinux
+    kphelper symbols --analysis --refresh
+
+  target sessions:
+    kphelper run
+    kphelper debug ./vmlinux
+    kphelper debug ./vmlinux --nokaslr
+    kphelper remote 127.0.0.1 1337
 """
 
 

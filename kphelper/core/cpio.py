@@ -47,14 +47,17 @@ def read_marker(marker):
 
 
 @contextmanager
-def preserved_metadata_state():
+def preserved_metadata_state(state_path=None):
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         yield None
         return
     if not shutil.which("fakeroot"):
-        raise KphelperError(
-            "fakeroot not found; install fakeroot or use the command's --sudo option"
-        )
+        raise KphelperError("fakeroot not found; install fakeroot for initramfs operations")
+    if state_path is not None:
+        state_path = Path(state_path).resolve()
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        yield state_path
+        return
     with tempfile.TemporaryDirectory(prefix="kphelper-fakeroot-") as temporary:
         yield Path(temporary) / "state"
 
@@ -72,7 +75,10 @@ def run_cpio_command(
     if fakeroot_state is not None:
         state_option = "-i" if load_state else "-s"
         arguments = ["fakeroot", state_option, str(fakeroot_state), "--"] + arguments
-    subprocess.run(arguments, cwd=cwd, check=True)
+    environment = os.environ.copy()
+    if fakeroot_state is not None:
+        environment["FAKEROOTDONTTRYCHOWN"] = "1"
+    subprocess.run(arguments, cwd=cwd, check=True, env=environment)
 
 
 def unpack_cpio(cpio_path, root_dir="root", reuse_existing=True, fakeroot_state=None):

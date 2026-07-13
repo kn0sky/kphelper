@@ -5,9 +5,6 @@ from unittest.mock import patch
 
 from kphelper.core.analysis import (
     _patch_init_for_root,
-    _privileged_repack,
-    _release_privileged_root,
-    _sudo_run,
     prepare_analysis_root,
 )
 from kphelper.core.checksec import (
@@ -28,7 +25,12 @@ from kphelper.core.probe_report import render_live_report
 from kphelper.core.qemu import parse_qemu_run_text
 from kphelper.core.discovery import find_cpio, find_vmlinux
 from kphelper.core.ksym import kallsyms_query_command, parse_kallsyms, parse_kptr_value
-from kphelper.core.pack import ensure_clean_pack_root, repack_cpio
+from kphelper.core.pack import (
+    ensure_clean_pack_root,
+    extract_rootfs,
+    fakeroot_state_path,
+    repack_cpio,
+)
 from kphelper.core.runfile import create_debug_run_copy, update_run_initrd
 from kphelper.core.symbols import render_symbols
 
@@ -160,6 +162,21 @@ class ChecksecParsingTests(unittest.TestCase):
         self.assertIn("Live runtime probe", output)
         self.assertIn("known from rootfs startup scripts", output)
 
+    def test_render_live_symbols_aligns_short_and_long_names(self):
+        output = render_live_report(
+            {
+                "symbols": {
+                    "commit_creds": 0xffffffff81072540,
+                    "swapgs_restore_regs_and_return_to_usermode": 0xffffffff81800e10,
+                },
+            },
+            color=False,
+        )
+        symbol_lines = [line for line in output.splitlines() if "Readable:" in line]
+
+        self.assertEqual(len(symbol_lines), 2)
+        self.assertEqual(symbol_lines[0].index(":"), symbol_lines[1].index(":"))
+
     @patch("kphelper.core.guest.uuid.uuid4")
     def test_guest_command_markers_do_not_match_serial_echo(self, uuid4):
         uuid4.return_value.hex = "a" * 32
@@ -276,40 +293,6 @@ class AnalysisRootfsTests(unittest.TestCase):
             self.assertFalse((init_d / "S99ctf.kphelper-original").exists())
             self.assertTrue(any("S99ctf" in change for change in changes))
 
-    @patch("kphelper.core.analysis.subprocess.run")
-    def test_sudo_run_elevates_the_complete_command(self, run):
-        _sudo_run(["bash", "-o", "pipefail", "-c", "cpio command"])
-
-        run.assert_called_once_with(
-            ["sudo", "bash", "-o", "pipefail", "-c", "cpio command"],
-            cwd=None,
-            check=True,
-        )
-
-    @patch("kphelper.core.analysis._sudo_run")
-    def test_privileged_repack_uses_null_delimited_newc_pipeline(self, sudo_run):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / "root"
-            root.mkdir()
-            output = Path(tmp) / "analysis.cpio.gz"
-
-            _privileged_repack(root, output)
-
-        arguments = sudo_run.call_args_list[0].args[0]
-        self.assertEqual(arguments[:5], ["bash", "-o", "pipefail", "-c", arguments[4]])
-        self.assertIn("find . -print0", arguments[4])
-        self.assertIn("--format=newc --null", arguments[4])
-
-    @patch("kphelper.core.analysis._sudo_run")
-    @patch("kphelper.core.analysis.os.getgid", return_value=1000)
-    @patch("kphelper.core.analysis.os.getuid", return_value=1000)
-    def test_privileged_root_is_returned_to_invoking_user(self, _getuid, _getgid, sudo_run):
-        _release_privileged_root(".kphelper/analysis-root")
-
-        arguments = sudo_run.call_args.args[0]
-        self.assertEqual(arguments[:3], ["chown", "-R", "1000:1000"])
-
-
 class PackTests(unittest.TestCase):
     def test_clean_pack_root_removes_readonly_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -324,6 +307,24 @@ class PackTests(unittest.TestCase):
             self.assertEqual(cleaned, root)
             self.assertEqual(list(root.iterdir()), [])
 
+    @patch("kphelper.core.pack.unpack_cpio")
+    @patch("kphelper.core.pack.preserved_metadata_state")
+    def test_rootfs_extract_keeps_metadata_state_outside_workspace(self, metadata_state, unpack):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "rootfs"
+            state = fakeroot_state_path(root)
+            metadata_state.return_value.__enter__.return_value = state
+
+            def create_marker(_source, extracted_root, **_kwargs):
+                (Path(extracted_root) / ".kphelper-cpio-source").write_text("marker")
+
+            unpack.side_effect = create_marker
+            result = extract_rootfs("rootfs.cpio", root_dir=root)
+
+            self.assertEqual(result, root)
+            metadata_state.assert_called_once_with(state)
+            self.assertFalse((root / ".kphelper-cpio-source").exists())
+
     @patch("kphelper.core.cpio.subprocess.run")
     def test_cpio_command_saves_fakeroot_state_during_extraction(self, run):
         state = Path("/tmp/fakeroot-state")
@@ -333,6 +334,10 @@ class PackTests(unittest.TestCase):
         arguments = run.call_args.args[0]
         self.assertEqual(arguments[:4], ["fakeroot", "-s", str(state), "--"])
         self.assertEqual(arguments[4:9], ["bash", "-o", "pipefail", "-c", "cpio command"])
+        self.assertEqual(
+            run.call_args.kwargs["env"]["FAKEROOTDONTTRYCHOWN"],
+            "1",
+        )
 
     @patch("kphelper.core.cpio.shutil.which", return_value=None)
     @patch("kphelper.core.cpio.os.geteuid", return_value=1000)
@@ -341,6 +346,15 @@ class PackTests(unittest.TestCase):
             with preserved_metadata_state():
                 pass
 
+    @patch("kphelper.core.cpio.shutil.which", return_value="/usr/bin/fakeroot")
+    @patch("kphelper.core.cpio.os.geteuid", return_value=1000)
+    def test_metadata_state_can_persist_outside_temporary_directory(self, _geteuid, _which):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "rootfs.fakeroot-state"
+
+            with preserved_metadata_state(state) as result:
+                self.assertEqual(result, state.resolve())
+
     @patch("kphelper.core.pack.run_cpio_command")
     def test_repack_loads_saved_fakeroot_state(self, run_cpio):
         with tempfile.TemporaryDirectory() as tmp:
@@ -348,11 +362,13 @@ class PackTests(unittest.TestCase):
             root.mkdir()
             output = Path(tmp) / "packed.cpio.gz"
             state = Path(tmp) / "fakeroot-state"
+            state.write_text("fakeroot state")
 
             repack_cpio(root, output, fakeroot_state=state)
 
         self.assertEqual(run_cpio.call_args.kwargs["fakeroot_state"], state)
         self.assertTrue(run_cpio.call_args.kwargs["load_state"])
+        self.assertIn("! -path './.kphelper-cpio-source'", run_cpio.call_args.args[0])
 
     def test_update_run_initrd_rewrites_direct_path_and_creates_backup(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -79,7 +79,7 @@
 
 ### Rootfs 独立命令组
 
-已提供 `rootfs make-analysis`。后续增加 `rootfs extract`、`rootfs list`、`rootfs inject` 和 `rootfs repack`，复用安全目录和缓存机制，不再把所有 rootfs 操作绑定到 `pack`。
+已提供 `rootfs make-analysis`、`rootfs extract` 和 `rootfs repack`。后续增加 `rootfs list` 和 `rootfs inject`，复用安全目录和缓存机制，不再把所有 rootfs 操作绑定到 `pack`。
 
 ## 第三阶段：分析能力扩展
 

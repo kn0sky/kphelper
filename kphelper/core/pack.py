@@ -17,6 +17,8 @@ from .runfile import update_run_initrd
 DEFAULT_PACK_ROOT = "root-pack"
 DEFAULT_OUTPUT = "packed-rootfs.cpio.gz"
 DEFAULT_TARGET = "tmp/exp"
+DEFAULT_ROOTFS_ROOT = ".kphelper/rootfs"
+DEFAULT_ROOTFS_OUTPUT = ".kphelper/rootfs-repacked.cpio.gz"
 
 
 def _make_directories_writable(root_dir):
@@ -44,7 +46,7 @@ def select_cpio(run_path="run.sh", cpio_path=None):
     if found:
         return found
 
-    raise KphelperError("cannot find initramfs cpio; pass it explicitly: kphelper pack <cpio>")
+    raise KphelperError("cannot find initramfs cpio; pass the archive path explicitly")
 
 
 def ensure_clean_pack_root(root_dir):
@@ -70,6 +72,11 @@ def ensure_clean_pack_root(root_dir):
     return root_dir
 
 
+def fakeroot_state_path(root_dir):
+    root_dir = Path(root_dir)
+    return root_dir.with_name(root_dir.name + ".fakeroot-state").resolve()
+
+
 def copy_exp_into_root(root_dir, local_exp=LOCAL_EXP, target=DEFAULT_TARGET):
     local_exp = Path(local_exp)
     if not local_exp.exists():
@@ -93,13 +100,18 @@ def repack_cpio(root_dir, output, fakeroot_state=None):
     else:
         raise KphelperError("output must not be inside pack root: %s" % output_path)
     cmd_output = output_path.resolve()
-    cmd = "find . -print0 | cpio -o --format=newc --null --quiet | gzip -9 > \"$1\""
+    cmd_output.parent.mkdir(parents=True, exist_ok=True)
+    cmd = (
+        "find . ! -path './%s' -print0 | "
+        "cpio -o --format=newc --null --quiet | gzip -9 > \"$1\""
+        % CPIO_MARKER
+    )
     try:
         run_cpio_command(
             cmd,
             root_dir,
             fakeroot_state=fakeroot_state,
-            load_state=fakeroot_state is not None,
+            load_state=fakeroot_state is not None and Path(fakeroot_state).is_file(),
             command_args=(cmd_output,),
         )
     except FileNotFoundError as error:
@@ -108,6 +120,36 @@ def repack_cpio(root_dir, output, fakeroot_state=None):
         raise KphelperError("failed to repack %s, exit code: %d" % (output_path, error.returncode)) from error
     log.success("repacked initramfs -> %s", output_path)
     return output_path
+
+
+def extract_rootfs(cpio_path=None, run_path="run.sh", root_dir=DEFAULT_ROOTFS_ROOT):
+    source = select_cpio(run_path, cpio_path)
+    root_dir = ensure_clean_pack_root(root_dir)
+    state_path = fakeroot_state_path(root_dir)
+    state_path.unlink(missing_ok=True)
+    with preserved_metadata_state(state_path) as fakeroot_state:
+        unpack_cpio(
+            source,
+            root_dir,
+            reuse_existing=False,
+            fakeroot_state=fakeroot_state,
+        )
+    (Path(root_dir) / CPIO_MARKER).unlink(missing_ok=True)
+    log.success("extracted initramfs -> %s", root_dir)
+    return root_dir
+
+
+def repack_rootfs(root_dir=DEFAULT_ROOTFS_ROOT, output=DEFAULT_ROOTFS_OUTPUT):
+    root_dir = Path(root_dir)
+    if not root_dir.is_dir():
+        raise KphelperError("rootfs directory not found: %s" % root_dir)
+    state_path = fakeroot_state_path(root_dir)
+    fakeroot_state = state_path if state_path.is_file() else None
+    if hasattr(os, "geteuid") and os.geteuid() != 0 and fakeroot_state is None:
+        raise KphelperError(
+            "fakeroot metadata state not found; extract with: kphelper rootfs extract"
+        )
+    return repack_cpio(root_dir, output, fakeroot_state=fakeroot_state)
 
 
 def pack_exp(cpio_path=None, run_path="run.sh", root_dir=DEFAULT_PACK_ROOT, output=DEFAULT_OUTPUT, target=DEFAULT_TARGET, update_run=True):

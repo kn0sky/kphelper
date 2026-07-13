@@ -1,9 +1,10 @@
-from kphelper.core.analysis import analysis_address_scope, resolve_analysis_run
+from kphelper.core.analysis import analysis_address_scope, create_analysis_environment
 from kphelper.core.checksec import DEFAULT_CHECKSEC_ROOT, collect_checksec, run_checksec
 from kphelper.core.checksec_report import render_report
 from kphelper.core.errors import KphelperError
 from kphelper.core.findings import Finding, RuntimeProbeReport
 from kphelper.core.guest import add_guest_timeout_arguments, timeouts_from_args
+from kphelper.core.pwn import log
 from kphelper.core.probe import probe_guest_runtime
 from kphelper.core.probe_report import render_live_report
 from kphelper.core.runtime_cache import (
@@ -54,7 +55,7 @@ def register(subparsers):
     parser.add_argument(
         "--analysis",
         action="store_true",
-        help="use the generated privileged analysis environment for live probes",
+        help="create and use an analysis rootfs for --live or --all",
     )
     add_guest_timeout_arguments(parser)
     parser.set_defaults(handler=handle)
@@ -83,7 +84,14 @@ def handle(args):
     if args.analysis:
         if not (args.live or args.all):
             raise KphelperError("--analysis requires --live or --all")
-        args.run = str(resolve_analysis_run())
+        environment = create_analysis_environment(
+            cpio_path=args.cpio,
+            run_path=args.run,
+        )
+        args.run = str(environment.run_path)
+        args.cpio = str(environment.cpio_path)
+        log.success("analysis rootfs: %s", environment.cpio_path)
+        log.success("analysis run script: %s", environment.run_path)
     if args.live:
         live_result = _run_live(args)
         report = _render_and_cache_live(args, live_result, color)
