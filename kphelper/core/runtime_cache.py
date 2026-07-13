@@ -178,7 +178,7 @@ def load_runtime_report(report_path=DEFAULT_RUNTIME_REPORT, validate=True):
         payload = json.loads(report_path.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
         raise KphelperError(
-            "runtime report not found; run: kphelper checksec --analysis --all"
+            "runtime report not found; run: kphelper checksec --all"
         ) from error
     except (OSError, ValueError) as error:
         raise KphelperError("invalid runtime report: %s" % report_path) from error

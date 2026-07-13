@@ -232,16 +232,14 @@ kphelper checksec rootfs.cpio.gz
 kphelper checksec -r ./run.sh rootfs.cpio --no-color
 kphelper checksec --live
 kphelper checksec --all --boot-timeout 30
-kphelper checksec --all --analysis
+kphelper checksec --all
 ```
 
-The default mode performs static analysis only. `--live` starts `run.sh` and performs runtime probes only. `--all` always renders the static report and then appends live results; if no interactive guest shell is reached, the live section is marked `Skipped` instead of discarding the static report. Use `--boot-timeout` and `--command-timeout` for slow guests.
-
-Add `--analysis` to create a separate analysis rootfs with fakeroot before `--live` or `--all`:
+The default mode performs static analysis only. `--live` and `--all` automatically create a separate analysis rootfs with fakeroot, change the supported challenge shell from UID/GID 1337 to UID/GID 0, and boot the generated run script. `--live` renders runtime probes only. `--all` renders the generated rootfs static report and then appends live results; if no interactive guest shell is reached, the live section is marked `Skipped` instead of discarding the static report. Use `--boot-timeout` and `--command-timeout` for slow guests.
 
 ```bash
-kphelper checksec --live --analysis
-kphelper checksec --all --analysis
+kphelper checksec --live
+kphelper checksec --all
 ```
 
 Live probes only supplement information that static analysis cannot confirm. For example, statically detected `kptr_restrict` and `dmesg_restrict` values are reused rather than read again. Permission-dependent probes are reported as `Skipped` or `Hidden` instead of aborting the complete report.
@@ -298,12 +296,12 @@ The flow uses `fakeroot` to preserve cpio ownership and device metadata without 
 
 This creates `.kphelper/analysis-rootfs.cpio.gz` and `.kphelper/run-analysis.sh`. The original initramfs and `run.sh` are never modified. The generator makes only the supported final shell identity change and does not place backup scripts in startup directories.
 
-`checksec --live/--all` creates the environment automatically when passed `--analysis`. The standalone command remains available when only the generated files are needed:
+`checksec --live/--all` always creates this environment automatically. The standalone command remains available when only the generated files are needed:
 
 ```bash
 kphelper symbols --analysis --refresh
-kphelper checksec --live --analysis
-kphelper checksec --all --analysis
+kphelper checksec --live
+kphelper checksec --all
 ```
 
 The analysis image deliberately differs from the original privilege configuration and is intended only for local investigation. If the original command line enables KASLR, collected absolute addresses are valid for the current boot only. Module addresses can also depend on module load order even with `nokaslr`.

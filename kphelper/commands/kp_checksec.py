@@ -52,11 +52,6 @@ def register(subparsers):
         action="store_true",
         help="run static checksec and live probe together",
     )
-    parser.add_argument(
-        "--analysis",
-        action="store_true",
-        help="create and use an analysis rootfs for --live or --all",
-    )
     add_guest_timeout_arguments(parser)
     parser.set_defaults(handler=handle)
     return parser
@@ -81,13 +76,12 @@ def _render_and_cache_live(args, live_result, color):
 
 def handle(args):
     color = not args.no_color
-    if args.analysis:
-        if not (args.live or args.all):
-            raise KphelperError("--analysis requires --live or --all")
+    if args.live or args.all:
         environment = create_analysis_environment(
             cpio_path=args.cpio,
             run_path=args.run,
         )
+        args.analysis = True
         args.run = str(environment.run_path)
         args.cpio = str(environment.cpio_path)
         log.success("analysis rootfs: %s", environment.cpio_path)
@@ -95,8 +89,7 @@ def handle(args):
     if args.live:
         live_result = _run_live(args)
         report = _render_and_cache_live(args, live_result, color)
-        if args.analysis:
-            report += "\n[*] Analysis address scope: %s" % analysis_address_scope(args.run)
+        report += "\n[*] Analysis address scope: %s" % analysis_address_scope(args.run)
         print(report)
         return 0
 
@@ -125,8 +118,7 @@ def handle(args):
             )
             live_report = render_live_report(fallback, color=color)
         combined = static_report + "\n\n" + live_report
-        if args.analysis:
-            combined += "\n[*] Analysis address scope: %s" % analysis_address_scope(args.run)
+        combined += "\n[*] Analysis address scope: %s" % analysis_address_scope(args.run)
         print(combined)
         return 0
 

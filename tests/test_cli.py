@@ -34,7 +34,7 @@ class CliTests(unittest.TestCase):
 
         for example in [
             "kphelper init",
-            "kphelper checksec --all --analysis",
+            "kphelper checksec --all",
             "kphelper rootfs extract rootfs.cpio.gz",
             "kphelper rootfs repack .kphelper/rootfs",
             "kphelper pack rootfs.cpio.gz",
@@ -52,6 +52,17 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(extract.cpio, "rootfs.cpio")
         self.assertEqual(repack.root, ".kphelper/rootfs")
+
+    def test_checksec_live_modes_do_not_require_analysis_flag(self):
+        parser = build_parser()
+
+        live = parser.parse_args(["checksec", "--live"])
+        combined = parser.parse_args(["checksec", "--all"])
+
+        self.assertTrue(live.live)
+        self.assertTrue(combined.all)
+        checksec_help = parser._subparsers._group_actions[0].choices["checksec"].format_help()
+        self.assertNotIn("--analysis", checksec_help)
 
     def test_static_checksec_runs_without_site_packages(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,7 +108,6 @@ class CliTests(unittest.TestCase):
             no_color=True,
             live=True,
             all=False,
-            analysis=True,
             boot_timeout=30,
             command_timeout=8,
         )
@@ -109,6 +119,7 @@ class CliTests(unittest.TestCase):
             run_path="run.sh",
         )
         self.assertEqual(args.run, ".kphelper/run-analysis.sh")
+        self.assertTrue(args.analysis)
         print_output.assert_any_call("live report\n[*] Analysis address scope: current boot only")
 
     def test_checksec_all_uses_generated_analysis_run_and_cpio(self):
@@ -123,7 +134,6 @@ class CliTests(unittest.TestCase):
             no_color=True,
             live=False,
             all=True,
-            analysis=True,
             boot_timeout=30,
             command_timeout=8,
         )
@@ -162,6 +172,7 @@ class CliTests(unittest.TestCase):
             ".kphelper/analysis-rootfs.cpio.gz",
             ".kphelper/checksec-root",
         )
+        self.assertTrue(args.analysis)
 
     @patch("kphelper.core.session.process")
     def test_local_target_rejects_missing_run_script(self, process):

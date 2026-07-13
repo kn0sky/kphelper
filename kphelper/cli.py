@@ -37,7 +37,7 @@ examples:
     kphelper checksec
     kphelper checksec rootfs.cpio.gz --no-color
     kphelper checksec --live
-    kphelper checksec --all --analysis
+    kphelper checksec --all
 
   rootfs workflows:
     kphelper rootfs extract rootfs.cpio.gz --root .kphelper/rootfs
