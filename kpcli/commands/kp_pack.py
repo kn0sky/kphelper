@@ -1,4 +1,4 @@
-from kphelper.core.pack import pack_exp
+from kpcli.core.pack import pack_exp
 
 
 def register(subparsers):

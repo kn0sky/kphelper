@@ -3,14 +3,14 @@ import os
 import signal
 
 from .discovery import find_vmlinux
-from .errors import KphelperError
+from .errors import KpcliError
 
 
 def kgdb(symbol_file="vmlinux"):
     try:
         from pwnlib.util.misc import run_in_new_terminal
     except ImportError as error:
-        raise KphelperError(
+        raise KpcliError(
             "pwntools is required for debug sessions; install with: pip install 'pwntools>=4.12,<5'"
         ) from error
 
@@ -38,7 +38,7 @@ def kgdb(symbol_file="vmlinux"):
     try:
         return run_in_new_terminal(cmd)   # 在 tmux 右屏开 gdb
     except Exception as error:
-        raise KphelperError("failed to start GDB terminal: %s" % error) from error
+        raise KpcliError("failed to start GDB terminal: %s" % error) from error
 
 
 def close_debugger(handle):

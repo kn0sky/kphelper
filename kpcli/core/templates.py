@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from .errors import KphelperError
+from .errors import KpcliError
 from .pwn import log
 
 
@@ -99,7 +99,7 @@ int main(void) {
 def write_exp_template(path="exp.c", force=False):
     path = Path(path)
     if path.exists() and not force:
-        raise KphelperError("%s already exists; use --force to overwrite" % path)
+        raise KpcliError("%s already exists; use --force to overwrite" % path)
     path.write_text(EXP_C_TEMPLATE)
     log.success("created %s", path)
     return path

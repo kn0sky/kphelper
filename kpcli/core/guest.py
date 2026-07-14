@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass
 
 from .constants import PROMPTS
-from .errors import KphelperError
+from .errors import KpcliError
 
 
 DEFAULT_BOOT_TIMEOUT = 30
@@ -43,7 +43,7 @@ class GuestShell:
     def _receive_prompt(self, timeout):
         data = self.io.recvuntil(PROMPTS, timeout=timeout) or b""
         if not data.endswith(PROMPTS):
-            raise KphelperError(
+            raise KpcliError(
                 "guest shell prompt not reached within %d seconds; ensure QEMU uses serial stdio and does not boot with -S"
                 % timeout
             )
@@ -60,46 +60,46 @@ class GuestShell:
         if self.ready:
             return
         self._receive_prompt(self.timeouts.boot)
-        marker = "__KPHELPER_READY_%s__" % uuid.uuid4().hex
+        marker = "__KPCLI_READY_%s__" % uuid.uuid4().hex
         self.io.sendline(self._marker_printf(marker).encode())
         data = self.io.recvuntil(marker.encode(), timeout=self.timeouts.command) or b""
         if marker.encode() not in data:
-            raise KphelperError("guest shell did not execute readiness probe")
+            raise KpcliError("guest shell did not execute readiness probe")
         self._receive_prompt(self.timeouts.command)
         self.ready = True
 
     def run(self, command):
         self.wait_ready()
         token = uuid.uuid4().hex
-        start_marker = "__KPHELPER_START_%s__" % token
-        end_marker = "__KPHELPER_END_%s__" % token
+        start_marker = "__KPCLI_START_%s__" % token
+        end_marker = "__KPCLI_END_%s__" % token
         end_prefix = (end_marker + ":").encode()
-        payload = "%s; { %s; }; __kphelper_status=$?; %s" % (
+        payload = "%s; { %s; }; __kpcli_status=$?; %s" % (
             self._marker_printf(start_marker),
             command,
             self._marker_printf(
                 end_marker,
                 format_string="%s%s:%s\\n",
-                extra_arguments=' "$__kphelper_status"',
+                extra_arguments=' "$__kpcli_status"',
             ),
         )
         self.io.sendline(payload.encode())
 
         start_data = self.io.recvuntil(start_marker.encode(), timeout=self.timeouts.command) or b""
         if start_marker.encode() not in start_data:
-            raise KphelperError(
+            raise KpcliError(
                 "guest command timed out after %d seconds: %s"
                 % (self.timeouts.command, command)
             )
         data = self.io.recvuntil(end_prefix, timeout=self.timeouts.command) or b""
         if end_prefix not in data:
-            raise KphelperError(
+            raise KpcliError(
                 "guest command timed out after %d seconds: %s"
                 % (self.timeouts.command, command)
             )
         status_data = self.io.recvuntil(PROMPTS, timeout=self.timeouts.command) or b""
         if not status_data.endswith(PROMPTS):
-            raise KphelperError("guest command completed without returning a shell prompt")
+            raise KpcliError("guest command completed without returning a shell prompt")
         status_text = status_data[:-2].decode(errors="replace").strip()
         try:
             status = int(status_text.splitlines()[0])

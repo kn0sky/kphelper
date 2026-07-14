@@ -1,14 +1,14 @@
 import re
 import shlex
 
-from .errors import KphelperError
+from .errors import KpcliError
 from .guest import GuestShell, GuestTimeouts
 from .symbols import DEFAULT_SYMBOLS
 
 
 def validate_symbol_name(name):
     if not re.fullmatch(r"[A-Za-z0-9_.$]+", name):
-        raise KphelperError("unsafe symbol name: %s" % name)
+        raise KpcliError("unsafe symbol name: %s" % name)
 
 
 def parse_kptr_value(output):
@@ -50,14 +50,14 @@ def extract_guest_ksyms(io, names=DEFAULT_SYMBOLS, timeouts=None):
     kptr = parse_kptr_value(kptr_output)
     if kptr is None:
         detail = kptr_output.strip() or "no output"
-        raise KphelperError(
+        raise KpcliError(
             "cannot read /proc/sys/kernel/kptr_restrict "
             "(status=%s, output=%r)" % (kptr_status, detail)
         )
     if kptr != 0:
-        raise KphelperError("/proc/kallsyms addresses are hidden: kptr_restrict=%d" % kptr)
+        raise KpcliError("/proc/kallsyms addresses are hidden: kptr_restrict=%d" % kptr)
 
     output, status = shell.run(kallsyms_query_command(names))
     if status != 0:
-        raise KphelperError("failed to query /proc/kallsyms (status=%s)" % status)
+        raise KpcliError("failed to query /proc/kallsyms (status=%s)" % status)
     return parse_kallsyms(output, names)

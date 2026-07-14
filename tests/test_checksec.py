@@ -3,11 +3,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from kphelper.core.analysis import (
+from kpcli.core.analysis import (
     _patch_init_for_root,
     prepare_analysis_root,
 )
-from kphelper.core.checksec import (
+from kpcli.core.checksec import (
     DEFAULT_CHECKSEC_ROOT,
     detect_runsec,
     detect_sysctl_write,
@@ -17,22 +17,22 @@ from kphelper.core.checksec import (
     scan_init,
     startup_script_paths,
 )
-from kphelper.core.checksec_report import render_report
-from kphelper.core.guest import GuestShell
-from kphelper.core.cpio import preserved_metadata_state, run_cpio_command
-from kphelper.core.errors import KphelperError
-from kphelper.core.probe_report import render_live_report
-from kphelper.core.qemu import parse_qemu_run_text
-from kphelper.core.discovery import find_cpio, find_vmlinux
-from kphelper.core.ksym import kallsyms_query_command, parse_kallsyms, parse_kptr_value
-from kphelper.core.pack import (
+from kpcli.core.checksec_report import render_report
+from kpcli.core.guest import GuestShell
+from kpcli.core.cpio import preserved_metadata_state, run_cpio_command
+from kpcli.core.errors import KpcliError
+from kpcli.core.probe_report import render_live_report
+from kpcli.core.qemu import parse_qemu_run_text
+from kpcli.core.discovery import find_cpio, find_vmlinux
+from kpcli.core.ksym import kallsyms_query_command, parse_kallsyms, parse_kptr_value
+from kpcli.core.pack import (
     ensure_clean_pack_root,
     extract_rootfs,
     fakeroot_state_path,
     repack_cpio,
 )
-from kphelper.core.runfile import create_debug_run_copy, update_run_initrd
-from kphelper.core.symbols import render_symbols
+from kpcli.core.runfile import create_debug_run_copy, update_run_initrd
+from kpcli.core.symbols import render_symbols
 
 
 class ChecksecParsingTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class ChecksecParsingTests(unittest.TestCase):
         self.assertEqual(resolved, initrd)
 
     def test_checksec_cache_does_not_use_challenge_root_directory(self):
-        self.assertEqual(DEFAULT_CHECKSEC_ROOT, ".kphelper/checksec-root")
+        self.assertEqual(DEFAULT_CHECKSEC_ROOT, ".kpcli/checksec-root")
 
     def test_qemu_parser_does_not_treat_following_options_as_cmdline(self):
         config = parse_qemu_run_text(
@@ -194,11 +194,11 @@ class ChecksecParsingTests(unittest.TestCase):
         self.assertIn("unsigned long init_cred", output)
         self.assertNotIn("(*init_cred", output)
 
-    @patch("kphelper.core.guest.uuid.uuid4")
+    @patch("kpcli.core.guest.uuid.uuid4")
     def test_guest_command_markers_do_not_match_serial_echo(self, uuid4):
         uuid4.return_value.hex = "a" * 32
-        start = b"__KPHELPER_START_" + b"a" * 32 + b"__"
-        end = b"__KPHELPER_END_" + b"a" * 32 + b"__"
+        start = b"__KPCLI_START_" + b"a" * 32 + b"__"
+        end = b"__KPCLI_END_" + b"a" * 32 + b"__"
 
         class FakeIo:
             def __init__(self):
@@ -307,7 +307,7 @@ class AnalysisRootfsTests(unittest.TestCase):
                 shell_script.read_text(),
                 "#!/bin/sh\nsetsid cttyhack setuidgid 0 sh\n",
             )
-            self.assertFalse((init_d / "S99ctf.kphelper-original").exists())
+            self.assertFalse((init_d / "S99ctf.kpcli-original").exists())
             self.assertTrue(any("S99ctf" in change for change in changes))
 
 class PackTests(unittest.TestCase):
@@ -324,8 +324,8 @@ class PackTests(unittest.TestCase):
             self.assertEqual(cleaned, root)
             self.assertEqual(list(root.iterdir()), [])
 
-    @patch("kphelper.core.pack.unpack_cpio")
-    @patch("kphelper.core.pack.preserved_metadata_state")
+    @patch("kpcli.core.pack.unpack_cpio")
+    @patch("kpcli.core.pack.preserved_metadata_state")
     def test_rootfs_extract_keeps_metadata_state_outside_workspace(self, metadata_state, unpack):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "rootfs"
@@ -333,16 +333,16 @@ class PackTests(unittest.TestCase):
             metadata_state.return_value.__enter__.return_value = state
 
             def create_marker(_source, extracted_root, **_kwargs):
-                (Path(extracted_root) / ".kphelper-cpio-source").write_text("marker")
+                (Path(extracted_root) / ".kpcli-cpio-source").write_text("marker")
 
             unpack.side_effect = create_marker
             result = extract_rootfs("rootfs.cpio", root_dir=root)
 
             self.assertEqual(result, root)
             metadata_state.assert_called_once_with(state)
-            self.assertFalse((root / ".kphelper-cpio-source").exists())
+            self.assertFalse((root / ".kpcli-cpio-source").exists())
 
-    @patch("kphelper.core.cpio.subprocess.run")
+    @patch("kpcli.core.cpio.subprocess.run")
     def test_cpio_command_saves_fakeroot_state_during_extraction(self, run):
         state = Path("/tmp/fakeroot-state")
 
@@ -356,15 +356,15 @@ class PackTests(unittest.TestCase):
             "1",
         )
 
-    @patch("kphelper.core.cpio.shutil.which", return_value=None)
-    @patch("kphelper.core.cpio.os.geteuid", return_value=1000)
+    @patch("kpcli.core.cpio.shutil.which", return_value=None)
+    @patch("kpcli.core.cpio.os.geteuid", return_value=1000)
     def test_metadata_preservation_fails_instead_of_creating_broken_archive(self, _geteuid, _which):
-        with self.assertRaisesRegex(KphelperError, "fakeroot not found"):
+        with self.assertRaisesRegex(KpcliError, "fakeroot not found"):
             with preserved_metadata_state():
                 pass
 
-    @patch("kphelper.core.cpio.shutil.which", return_value="/usr/bin/fakeroot")
-    @patch("kphelper.core.cpio.os.geteuid", return_value=1000)
+    @patch("kpcli.core.cpio.shutil.which", return_value="/usr/bin/fakeroot")
+    @patch("kpcli.core.cpio.os.geteuid", return_value=1000)
     def test_metadata_state_can_persist_outside_temporary_directory(self, _geteuid, _which):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp) / "rootfs.fakeroot-state"
@@ -372,7 +372,7 @@ class PackTests(unittest.TestCase):
             with preserved_metadata_state(state) as result:
                 self.assertEqual(result, state.resolve())
 
-    @patch("kphelper.core.pack.run_cpio_command")
+    @patch("kpcli.core.pack.run_cpio_command")
     def test_repack_loads_saved_fakeroot_state(self, run_cpio):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "root"
@@ -385,6 +385,7 @@ class PackTests(unittest.TestCase):
 
         self.assertEqual(run_cpio.call_args.kwargs["fakeroot_state"], state)
         self.assertTrue(run_cpio.call_args.kwargs["load_state"])
+        self.assertIn("! -path './.kpcli-cpio-source'", run_cpio.call_args.args[0])
         self.assertIn("! -path './.kphelper-cpio-source'", run_cpio.call_args.args[0])
 
     def test_update_run_initrd_rewrites_direct_path_and_creates_backup(self):
@@ -401,7 +402,7 @@ class PackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             run_path = base / "run.sh"
-            debug_path = base / ".kphelper-run-debug.sh"
+            debug_path = base / ".kpcli-run-debug.sh"
             original = 'qemu-system-x86_64 -append "console=ttyS0" -initrd rootfs.cpio\n'
             run_path.write_text(original)
 
@@ -417,7 +418,7 @@ class PackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             run_path = base / "run.sh"
-            debug_path = base / ".kphelper-run-debug.sh"
+            debug_path = base / ".kpcli-run-debug.sh"
             run_path.write_text('qemu-system-x86_64 -append "console=ttyS0"\n')
 
             create_debug_run_copy(run_path, debug_path, nokaslr=True)

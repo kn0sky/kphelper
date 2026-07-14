@@ -34,7 +34,7 @@ root/
 root-pack/
 exp
 packed-rootfs.cpio.gz
-.kphelper-run-debug.sh
+.kpcli-run-debug.sh
 *.o
 *.ko.cmd
 *.mod

@@ -3,7 +3,7 @@ import importlib
 import sys
 
 from . import commands
-from .core.errors import KphelperError
+from .core.errors import KpcliError
 from .core.pwn import log
 
 
@@ -11,7 +11,7 @@ HELP_EPILOG = """\
 current directory requirements:
   run/debug mode:
     required: ./run.sh
-    debug auto-generates .kphelper-run-debug.sh with -s -S
+    debug auto-generates .kpcli-run-debug.sh with -s -S
     pass --nokaslr to explicitly disable KASLR in the debug copy
     debug also requires: symbol file
     default debug symbol file: ./vmlinux
@@ -31,31 +31,31 @@ target shell prompt:
 
 examples:
   project setup:
-    kphelper init
+    kpcli init
 
   security inspection:
-    kphelper checksec
-    kphelper checksec rootfs.cpio.gz --no-color
-    kphelper checksec --live
-    kphelper checksec --all
+    kpcli checksec
+    kpcli checksec rootfs.cpio.gz --no-color
+    kpcli checksec --live
+    kpcli checksec --all
 
   rootfs workflows:
-    kphelper rootfs extract rootfs.cpio.gz --root .kphelper/rootfs
-    kphelper rootfs repack .kphelper/rootfs -o repacked.cpio.gz
-    kphelper rootfs make-analysis
-    kphelper pack rootfs.cpio.gz -o packed-rootfs.cpio.gz
+    kpcli rootfs extract rootfs.cpio.gz --root .kpcli/rootfs
+    kpcli rootfs repack .kpcli/rootfs -o repacked.cpio.gz
+    kpcli rootfs make-analysis
+    kpcli pack rootfs.cpio.gz -o packed-rootfs.cpio.gz
 
   kernel symbols:
-    kphelper symbols
-    kphelper symbols --refresh
-    kphelper symbols --file ./vmlinux
-    kphelper symbols --analysis --refresh
+    kpcli symbols
+    kpcli symbols --refresh
+    kpcli symbols --file ./vmlinux
+    kpcli symbols --analysis --refresh
 
   target sessions:
-    kphelper run
-    kphelper debug ./vmlinux
-    kphelper debug ./vmlinux --nokaslr
-    kphelper remote 127.0.0.1 1337
+    kpcli run
+    kpcli debug ./vmlinux
+    kpcli debug ./vmlinux --nokaslr
+    kpcli remote 127.0.0.1 1337
 """
 
 
@@ -106,6 +106,6 @@ def main(argv=None):
     except KeyboardInterrupt:
         log.failure("interrupted")
         return 130
-    except KphelperError as e:
+    except KpcliError as e:
         log.failure(str(e))
         return 1

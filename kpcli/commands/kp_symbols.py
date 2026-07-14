@@ -1,16 +1,16 @@
-from kphelper.core.analysis import analysis_address_scope, resolve_analysis_run
-from kphelper.core.checksec import detect_runsec
-from kphelper.core.errors import KphelperError
-from kphelper.core.findings import RuntimeProbeReport
-from kphelper.core.guest import add_guest_timeout_arguments, timeouts_from_args
-from kphelper.core.ksym import extract_guest_ksyms
-from kphelper.core.runtime_cache import (
+from kpcli.core.analysis import analysis_address_scope, resolve_analysis_run
+from kpcli.core.checksec import detect_runsec
+from kpcli.core.errors import KpcliError
+from kpcli.core.findings import RuntimeProbeReport
+from kpcli.core.guest import add_guest_timeout_arguments, timeouts_from_args
+from kpcli.core.ksym import extract_guest_ksyms
+from kpcli.core.runtime_cache import (
     DEFAULT_RUNTIME_REPORT,
     load_runtime_report,
     save_runtime_report,
 )
-from kphelper.core.session import managed_session, local_target, remote_target
-from kphelper.core.symbols import (
+from kpcli.core.session import managed_session, local_target, remote_target
+from kpcli.core.symbols import (
     DEFAULT_SYMBOLS,
     KASLR_ANCHORS,
     extract_symbols,
@@ -65,7 +65,7 @@ def _runtime_symbols(args, names):
     else:
         run_result = detect_runsec(args.run)
         if run_result["run.sh"].status == "Missing":
-            raise KphelperError("%s not found" % args.run)
+            raise KpcliError("%s not found" % args.run)
         factory, factory_args = local_target, (args.run,)
         source = "guest:/proc/kallsyms"
 
@@ -115,13 +115,13 @@ def handle(args):
     names = tuple(args.symbols) if args.symbols else DEFAULT_SYMBOLS
     if args.analysis:
         if args.remote or args.file:
-            raise KphelperError("--analysis cannot be combined with --remote or --file")
+            raise KpcliError("--analysis cannot be combined with --remote or --file")
         if not args.refresh:
-            raise KphelperError("--analysis selects the refresh source; add --refresh")
+            raise KpcliError("--analysis selects the refresh source; add --refresh")
         args.run = str(resolve_analysis_run())
     if args.file:
         if args.refresh:
-            raise KphelperError("--refresh cannot be combined with --file")
+            raise KpcliError("--refresh cannot be combined with --file")
         symbol_file, symbols = extract_symbols(args.file, names)
         kaslr = {"status": "Static only", "detail": "addresses are link-time values; runtime slide is not available"}
         print(render_symbols(

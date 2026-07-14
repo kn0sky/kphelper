@@ -8,12 +8,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from kphelper.cli import build_parser
-from kphelper.commands.kp_checksec import handle as handle_checksec
-from kphelper.commands.kp_debug import handle as handle_debug
-from kphelper.commands.kp_symbols import handle as handle_symbols
-from kphelper.core.errors import KphelperError
-from kphelper.core.session import local_target, remote_target
+from kpcli.cli import build_parser
+from kpcli.commands.kp_checksec import handle as handle_checksec
+from kpcli.commands.kp_debug import handle as handle_debug
+from kpcli.commands.kp_symbols import handle as handle_symbols
+from kpcli.core.errors import KpcliError
+from kpcli.core.session import local_target, remote_target
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -33,14 +33,14 @@ class CliTests(unittest.TestCase):
         help_text = build_parser().format_help()
 
         for example in [
-            "kphelper init",
-            "kphelper checksec --all",
-            "kphelper rootfs extract rootfs.cpio.gz",
-            "kphelper rootfs repack .kphelper/rootfs",
-            "kphelper pack rootfs.cpio.gz",
-            "kphelper symbols --refresh",
-            "kphelper debug ./vmlinux --nokaslr",
-            "kphelper remote 127.0.0.1 1337",
+            "kpcli init",
+            "kpcli checksec --all",
+            "kpcli rootfs extract rootfs.cpio.gz",
+            "kpcli rootfs repack .kpcli/rootfs",
+            "kpcli pack rootfs.cpio.gz",
+            "kpcli symbols --refresh",
+            "kpcli debug ./vmlinux --nokaslr",
+            "kpcli remote 127.0.0.1 1337",
         ]:
             self.assertIn(example, help_text)
 
@@ -51,7 +51,7 @@ class CliTests(unittest.TestCase):
         repack = parser.parse_args(["rootfs", "repack"])
 
         self.assertEqual(extract.cpio, "rootfs.cpio")
-        self.assertEqual(repack.root, ".kphelper/rootfs")
+        self.assertEqual(repack.root, ".kpcli/rootfs")
 
     def test_checksec_live_modes_do_not_require_analysis_flag(self):
         parser = build_parser()
@@ -79,7 +79,7 @@ class CliTests(unittest.TestCase):
             env = os.environ.copy()
             env["PYTHONPATH"] = str(PROJECT_ROOT)
             result = subprocess.run(
-                [sys.executable, "-S", "-m", "kphelper", "checksec", "--no-color"],
+                [sys.executable, "-S", "-m", "kpcli", "checksec", "--no-color"],
                 cwd=tmp,
                 env=env,
                 text=True,
@@ -91,10 +91,10 @@ class CliTests(unittest.TestCase):
         self.assertIn("Kernel checksec", result.stdout)
         self.assertIn("KASLR", result.stdout)
 
-    @patch("kphelper.commands.kp_checksec.analysis_address_scope", return_value="current boot only")
-    @patch("kphelper.commands.kp_checksec._render_and_cache_live", return_value="live report")
-    @patch("kphelper.commands.kp_checksec._run_live")
-    @patch("kphelper.commands.kp_checksec.create_analysis_environment")
+    @patch("kpcli.commands.kp_checksec.analysis_address_scope", return_value="current boot only")
+    @patch("kpcli.commands.kp_checksec._render_and_cache_live", return_value="live report")
+    @patch("kpcli.commands.kp_checksec._run_live")
+    @patch("kpcli.commands.kp_checksec.create_analysis_environment")
     @patch("builtins.print")
     def test_checksec_live_prepares_and_uses_analysis_environment(
         self,
@@ -105,13 +105,13 @@ class CliTests(unittest.TestCase):
         _address_scope,
     ):
         create_analysis.return_value = SimpleNamespace(
-            cpio_path=Path(".kphelper/analysis-rootfs.cpio.gz"),
-            run_path=Path(".kphelper/run-analysis.sh"),
+            cpio_path=Path(".kpcli/analysis-rootfs.cpio.gz"),
+            run_path=Path(".kpcli/run-analysis.sh"),
         )
         args = SimpleNamespace(
             run="run.sh",
             cpio="rootfs.cpio",
-            root=".kphelper/checksec-root",
+            root=".kpcli/checksec-root",
             no_color=True,
             live=True,
             all=False,
@@ -125,19 +125,19 @@ class CliTests(unittest.TestCase):
             cpio_path="rootfs.cpio",
             run_path="run.sh",
         )
-        self.assertEqual(args.run, ".kphelper/run-analysis.sh")
+        self.assertEqual(args.run, ".kpcli/run-analysis.sh")
         self.assertTrue(args.analysis)
         print_output.assert_any_call("live report\n[*] Analysis address scope: current boot only")
 
     def test_checksec_all_uses_generated_analysis_run_and_cpio(self):
         environment = SimpleNamespace(
-            cpio_path=Path(".kphelper/analysis-rootfs.cpio.gz"),
-            run_path=Path(".kphelper/run-analysis.sh"),
+            cpio_path=Path(".kpcli/analysis-rootfs.cpio.gz"),
+            run_path=Path(".kpcli/run-analysis.sh"),
         )
         args = SimpleNamespace(
             run="run.sh",
             cpio="rootfs.cpio",
-            root=".kphelper/checksec-root",
+            root=".kpcli/checksec-root",
             no_color=True,
             live=False,
             all=True,
@@ -147,24 +147,24 @@ class CliTests(unittest.TestCase):
         with ExitStack() as stack:
             create_analysis = stack.enter_context(
                 patch(
-                    "kphelper.commands.kp_checksec.create_analysis_environment",
+                    "kpcli.commands.kp_checksec.create_analysis_environment",
                     return_value=environment,
                 )
             )
             collect = stack.enter_context(
-                patch("kphelper.commands.kp_checksec.collect_checksec", return_value=({}, None))
+                patch("kpcli.commands.kp_checksec.collect_checksec", return_value=({}, None))
             )
             stack.enter_context(
-                patch("kphelper.commands.kp_checksec.render_report", return_value="static report")
+                patch("kpcli.commands.kp_checksec.render_report", return_value="static report")
             )
             stack.enter_context(
-                patch("kphelper.commands.kp_checksec._run_live", side_effect=KphelperError("offline"))
+                patch("kpcli.commands.kp_checksec._run_live", side_effect=KpcliError("offline"))
             )
             stack.enter_context(
-                patch("kphelper.commands.kp_checksec.render_live_report", return_value="live report")
+                patch("kpcli.commands.kp_checksec.render_live_report", return_value="live report")
             )
             stack.enter_context(
-                patch("kphelper.commands.kp_checksec.analysis_address_scope", return_value="current boot only")
+                patch("kpcli.commands.kp_checksec.analysis_address_scope", return_value="current boot only")
             )
             stack.enter_context(patch("builtins.print"))
 
@@ -175,47 +175,47 @@ class CliTests(unittest.TestCase):
             run_path="run.sh",
         )
         collect.assert_called_once_with(
-            ".kphelper/run-analysis.sh",
-            ".kphelper/analysis-rootfs.cpio.gz",
-            ".kphelper/checksec-root",
+            ".kpcli/run-analysis.sh",
+            ".kpcli/analysis-rootfs.cpio.gz",
+            ".kpcli/checksec-root",
         )
         self.assertTrue(args.analysis)
 
-    @patch("kphelper.core.session.process")
+    @patch("kpcli.core.session.process")
     def test_local_target_rejects_missing_run_script(self, process):
-        with self.assertRaisesRegex(KphelperError, "startup script not found"):
+        with self.assertRaisesRegex(KpcliError, "startup script not found"):
             local_target("/definitely/missing/run.sh")
 
         process.assert_not_called()
 
-    @patch("kphelper.core.session.remote", side_effect=RuntimeError("connection refused"))
+    @patch("kpcli.core.session.remote", side_effect=RuntimeError("connection refused"))
     def test_remote_connection_errors_are_user_facing(self, _remote):
-        with self.assertRaisesRegex(KphelperError, "failed to connect to 127.0.0.1:1"):
+        with self.assertRaisesRegex(KpcliError, "failed to connect to 127.0.0.1:1"):
             remote_target("127.0.0.1", 1)
 
     def test_debugger_starts_before_upload_waits_for_paused_guest(self):
         events = []
         io = object()
         with ExitStack() as stack:
-            stack.enter_context(patch("kphelper.commands.kp_debug.build_only"))
+            stack.enter_context(patch("kpcli.commands.kp_debug.build_only"))
             stack.enter_context(
-                patch("kphelper.commands.kp_debug.create_debug_run_copy", return_value=Path("debug.sh"))
+                patch("kpcli.commands.kp_debug.create_debug_run_copy", return_value=Path("debug.sh"))
             )
-            session = stack.enter_context(patch("kphelper.commands.kp_debug.managed_session"))
+            session = stack.enter_context(patch("kpcli.commands.kp_debug.managed_session"))
             stack.enter_context(
-                patch("kphelper.commands.kp_debug.kgdb", side_effect=lambda _symbol: events.append("gdb"))
+                patch("kpcli.commands.kp_debug.kgdb", side_effect=lambda _symbol: events.append("gdb"))
             )
             stack.enter_context(
-                patch("kphelper.commands.kp_debug.upload_and_cd", side_effect=lambda _io: events.append("upload"))
+                patch("kpcli.commands.kp_debug.upload_and_cd", side_effect=lambda _io: events.append("upload"))
             )
-            stack.enter_context(patch("kphelper.commands.kp_debug.interact"))
+            stack.enter_context(patch("kpcli.commands.kp_debug.interact"))
             session.return_value.__enter__.return_value = io
             handle_debug(SimpleNamespace(symbol="vmlinux", nokaslr=False))
 
         self.assertEqual(events, ["gdb", "upload"])
 
-    @patch("kphelper.commands.kp_symbols._runtime_symbols")
-    @patch("kphelper.commands.kp_symbols._cached_symbols", return_value="cached symbols")
+    @patch("kpcli.commands.kp_symbols._runtime_symbols")
+    @patch("kpcli.commands.kp_symbols._cached_symbols", return_value="cached symbols")
     @patch("builtins.print")
     def test_symbols_uses_cache_unless_refresh_is_requested(self, print_output, cached, runtime):
         args = SimpleNamespace(

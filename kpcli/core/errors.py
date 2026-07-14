@@ -1,0 +1,2 @@
+class KpcliError(Exception):
+    pass

@@ -1,18 +1,18 @@
-from kphelper.core.analysis import analysis_address_scope, create_analysis_environment
-from kphelper.core.checksec import DEFAULT_CHECKSEC_ROOT, collect_checksec, run_checksec
-from kphelper.core.checksec_report import render_report
-from kphelper.core.errors import KphelperError
-from kphelper.core.findings import Finding, RuntimeProbeReport
-from kphelper.core.guest import add_guest_timeout_arguments, timeouts_from_args
-from kphelper.core.pwn import log
-from kphelper.core.probe import probe_guest_runtime
-from kphelper.core.probe_report import render_live_report
-from kphelper.core.runtime_cache import (
+from kpcli.core.analysis import analysis_address_scope, create_analysis_environment
+from kpcli.core.checksec import DEFAULT_CHECKSEC_ROOT, collect_checksec, run_checksec
+from kpcli.core.checksec_report import render_report
+from kpcli.core.errors import KpcliError
+from kpcli.core.findings import Finding, RuntimeProbeReport
+from kpcli.core.guest import add_guest_timeout_arguments, timeouts_from_args
+from kpcli.core.pwn import log
+from kpcli.core.probe import probe_guest_runtime
+from kpcli.core.probe_report import render_live_report
+from kpcli.core.runtime_cache import (
     DEFAULT_RUNTIME_HEADER,
     DEFAULT_RUNTIME_REPORT,
     save_runtime_report,
 )
-from kphelper.core.symbols import DEFAULT_SYMBOLS, KASLR_ANCHORS
+from kpcli.core.symbols import DEFAULT_SYMBOLS, KASLR_ANCHORS
 
 
 def register(subparsers):
@@ -110,7 +110,7 @@ def handle(args):
         try:
             live_result = _run_live(args, static_rootfs=init_result)
             live_report = _render_and_cache_live(args, live_result, color)
-        except KphelperError as error:
+        except KpcliError as error:
             fallback = RuntimeProbeReport(
                 findings={
                     name: Finding(

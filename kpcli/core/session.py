@@ -2,29 +2,29 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .constants import REMOTE_DIR
-from .errors import KphelperError
+from .errors import KpcliError
 from .pwn import process, remote
 
 
 def local_target(run_path="./run.sh"):
     run_path = Path(run_path)
     if not run_path.is_file():
-        raise KphelperError("QEMU startup script not found: %s" % run_path)
+        raise KpcliError("QEMU startup script not found: %s" % run_path)
     try:
         return process(["bash", str(run_path)])
-    except KphelperError:
+    except KpcliError:
         raise
     except Exception as error:
-        raise KphelperError("failed to start local target: %s" % error) from error
+        raise KpcliError("failed to start local target: %s" % error) from error
 
 
 def remote_target(ip, port):
     try:
         return remote(ip, port)
-    except KphelperError:
+    except KpcliError:
         raise
     except Exception as error:
-        raise KphelperError("failed to connect to %s:%s: %s" % (ip, port, error)) from error
+        raise KpcliError("failed to connect to %s:%s: %s" % (ip, port, error)) from error
 
 
 def cd_remote_tmp(io):

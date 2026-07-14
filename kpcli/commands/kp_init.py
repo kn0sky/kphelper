@@ -1,4 +1,4 @@
-from kphelper.core.templates import write_exp_template
+from kpcli.core.templates import write_exp_template
 
 
 def register(subparsers):

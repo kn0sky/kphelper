@@ -5,15 +5,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .cpio import CPIO_MARKER, preserved_metadata_state, unpack_cpio
-from .errors import KphelperError
+from .errors import KpcliError
 from .qemu import load_qemu_run
 from .runfile import update_run_initrd
 
 
-DEFAULT_ANALYSIS_ROOT = ".kphelper/analysis-root"
-DEFAULT_ANALYSIS_CPIO = ".kphelper/analysis-rootfs.cpio.gz"
-DEFAULT_ANALYSIS_RUN = ".kphelper/run-analysis.sh"
-ANALYSIS_MANIFEST = ".kphelper-analysis.json"
+DEFAULT_ANALYSIS_ROOT = ".kpcli/analysis-root"
+DEFAULT_ANALYSIS_CPIO = ".kpcli/analysis-rootfs.cpio.gz"
+DEFAULT_ANALYSIS_RUN = ".kpcli/run-analysis.sh"
+ANALYSIS_MANIFEST = ".kpcli-analysis.json"
 
 
 @dataclass(frozen=True)
@@ -42,13 +42,13 @@ def _startup_files(root_dir):
             candidates.extend(sorted(path for path in init_d.iterdir() if path.is_file()))
         return [path for path in candidates if path.is_file()]
     except PermissionError as error:
-        raise KphelperError("cannot read analysis root: %s" % root_dir) from error
+        raise KpcliError("cannot read analysis root: %s" % root_dir) from error
 
 
 def prepare_analysis_root(root_dir):
     files = _startup_files(root_dir)
     if not files:
-        raise KphelperError("analysis rootfs has no supported startup scripts")
+        raise KpcliError("analysis rootfs has no supported startup scripts")
 
     changes = []
     for path in files:
@@ -60,7 +60,7 @@ def prepare_analysis_root(root_dir):
         changes.extend("%s: %s" % (path.relative_to(root_dir), change) for change in file_changes)
 
     if not changes:
-        raise KphelperError(
+        raise KpcliError(
             "cannot find exact startup line: setsid cttyhack setuidgid 1337 sh"
         )
     return changes
@@ -111,8 +111,8 @@ def create_analysis_environment(
 def resolve_analysis_run(run_path=DEFAULT_ANALYSIS_RUN):
     path = Path(run_path)
     if not path.is_file():
-        raise KphelperError(
-            "analysis environment not found; create it with: kphelper rootfs make-analysis"
+        raise KpcliError(
+            "analysis environment not found; create it with: kpcli rootfs make-analysis"
         )
     return path
 

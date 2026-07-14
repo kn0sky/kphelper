@@ -3,19 +3,19 @@ import shutil
 import stat
 from pathlib import Path
 
-from .errors import KphelperError
+from .errors import KpcliError
 
 
 def update_run_initrd(run_path, output, backup=True):
     run_path = Path(run_path)
     if not run_path.exists():
-        raise KphelperError("%s not found; cannot update initrd path" % run_path)
+        raise KpcliError("%s not found; cannot update initrd path" % run_path)
 
     text = run_path.read_text(errors="replace")
     output = str(output)
     pattern = r"(-(?:initrd|initramfs)\s+)(['\"]?)([^\s'\"\\]+)(\2)"
     if not re.search(pattern, text):
-        raise KphelperError("cannot find a direct -initrd path in %s" % run_path)
+        raise KpcliError("cannot find a direct -initrd path in %s" % run_path)
 
     if backup:
         backup_path = run_path.with_suffix(run_path.suffix + ".bak")
@@ -41,7 +41,7 @@ def ensure_append_token(text, token):
     new_text, count = re.subn(pattern, replace, text, count=1, flags=re.DOTALL)
     if count:
         return new_text
-    raise KphelperError("cannot find direct quoted -append in run.sh")
+    raise KpcliError("cannot find direct quoted -append in run.sh")
 
 
 def ensure_qemu_flag(text, flag):
@@ -49,16 +49,16 @@ def ensure_qemu_flag(text, flag):
         return text
     match = re.search(r"(qemu-system-[^\s\\]+)", text)
     if not match:
-        raise KphelperError("cannot find qemu-system command in run.sh")
+        raise KpcliError("cannot find qemu-system command in run.sh")
     insert_at = match.end()
     return text[:insert_at] + " " + flag + text[insert_at:]
 
 
-def create_debug_run_copy(run_path="run.sh", output=".kphelper-run-debug.sh", nokaslr=False):
+def create_debug_run_copy(run_path="run.sh", output=".kpcli-run-debug.sh", nokaslr=False):
     run_path = Path(run_path)
     output = Path(output)
     if not run_path.exists():
-        raise KphelperError("%s not found" % run_path)
+        raise KpcliError("%s not found" % run_path)
 
     text = run_path.read_text(errors="replace")
     if nokaslr:

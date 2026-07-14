@@ -1,7 +1,7 @@
 import importlib
 import sys
 
-from .errors import KphelperError
+from .errors import KpcliError
 
 
 _pwn = None
@@ -19,7 +19,7 @@ def _load_pwntools(required=True):
         if _pwn is not None:
             _pwn.context.terminal = ["tmux", "splitw", "-h"]
     if required and _pwn is None:
-        raise KphelperError(
+        raise KpcliError(
             "pwntools is required for guest sessions; install with: pip install 'pwntools>=4.12,<5'"
         )
     return _pwn

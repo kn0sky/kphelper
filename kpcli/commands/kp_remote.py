@@ -1,5 +1,5 @@
-from kphelper.core.session import interact, managed_session, remote_target
-from kphelper.core.workflow import build_only, upload_and_cd
+from kpcli.core.session import interact, managed_session, remote_target
+from kpcli.core.workflow import build_only, upload_and_cd
 
 
 def register(subparsers):

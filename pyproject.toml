@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kphelper"
+name = "kpcli"
 version = "0.1.0"
 description = "Kernel pwn helper CLI"
 requires-python = ">=3.8"
@@ -12,4 +12,4 @@ dependencies = [
 ]
 
 [project.scripts]
-kphelper = "kphelper.cli:main"
+kpcli = "kpcli.cli:main"

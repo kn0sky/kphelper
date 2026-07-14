@@ -1,9 +1,9 @@
-from kphelper.core.debug import close_debugger, kgdb
-from kphelper.core.discovery import find_vmlinux
-from kphelper.core.pwn import log
-from kphelper.core.runfile import create_debug_run_copy
-from kphelper.core.session import interact, local_target, managed_session
-from kphelper.core.workflow import build_only, upload_and_cd
+from kpcli.core.debug import close_debugger, kgdb
+from kpcli.core.discovery import find_vmlinux
+from kpcli.core.pwn import log
+from kpcli.core.runfile import create_debug_run_copy
+from kpcli.core.session import interact, local_target, managed_session
+from kpcli.core.workflow import build_only, upload_and_cd
 
 
 def register(subparsers):

@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 from .discovery import find_vmlinux
-from .errors import KphelperError
+from .errors import KpcliError
 
 
 DEFAULT_SYMBOLS = (
@@ -39,9 +39,9 @@ FUNCTION_SYMBOLS = frozenset((
 def resolve_symbol_file(symbol_file=None):
     path = Path(symbol_file) if symbol_file else find_vmlinux()
     if not path:
-        raise KphelperError("vmlinux not found; pass --file explicitly")
+        raise KpcliError("vmlinux not found; pass --file explicitly")
     if not path.exists():
-        raise KphelperError("%s not found" % path)
+        raise KpcliError("%s not found" % path)
     return path
 
 
@@ -64,7 +64,7 @@ def parse_nm_output(output, names):
 
 def extract_symbols(symbol_file=None, names=DEFAULT_SYMBOLS):
     if not shutil.which("nm"):
-        raise KphelperError("nm not found")
+        raise KpcliError("nm not found")
 
     symbol_file = resolve_symbol_file(symbol_file)
     requested = tuple(dict.fromkeys(tuple(names) + KASLR_ANCHORS))
@@ -76,7 +76,7 @@ def extract_symbols(symbol_file=None, names=DEFAULT_SYMBOLS):
             errors="replace",
         )
     except subprocess.CalledProcessError as error:
-        raise KphelperError(
+        raise KpcliError(
             "nm failed for %s: %s" % (symbol_file, error.output.strip())
         ) from error
     return symbol_file, parse_nm_output(output, requested)

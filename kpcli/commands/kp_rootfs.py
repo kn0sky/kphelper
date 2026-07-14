@@ -1,17 +1,17 @@
-from kphelper.core.analysis import (
+from kpcli.core.analysis import (
     DEFAULT_ANALYSIS_CPIO,
     DEFAULT_ANALYSIS_ROOT,
     DEFAULT_ANALYSIS_RUN,
     analysis_address_scope,
     create_analysis_environment,
 )
-from kphelper.core.pack import (
+from kpcli.core.pack import (
     DEFAULT_ROOTFS_OUTPUT,
     DEFAULT_ROOTFS_ROOT,
     extract_rootfs,
     repack_rootfs,
 )
-from kphelper.core.pwn import log
+from kpcli.core.pwn import log
 
 
 def register(subparsers):

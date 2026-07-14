@@ -5,13 +5,13 @@ from pathlib import Path
 from .checksec_report import render_report
 from .cpio import unpack_cpio
 from .discovery import find_cpio
-from .errors import KphelperError
+from .errors import KpcliError
 from .findings import Finding
 from .formatting import DISABLED, ENABLED, UNKNOWN
 from .qemu import parse_qemu_run_text, resolve_run_file
 
 
-DEFAULT_CHECKSEC_ROOT = ".kphelper/checksec-root"
+DEFAULT_CHECKSEC_ROOT = ".kpcli/checksec-root"
 
 
 def _finding(value, source):
@@ -137,7 +137,7 @@ def collect_checksec(run_path="run.sh", cpio_path=None, root_dir=DEFAULT_CHECKSE
     if cpio_path:
         run_result["Initrd"] = _finding(str(cpio_path), "filesystem")
         if not shutil.which("cpio"):
-            raise KphelperError("cpio not found")
+            raise KpcliError("cpio not found")
         init_result = scan_init(unpack_cpio(cpio_path, root_dir))
     return run_result, init_result
 

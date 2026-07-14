@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 
 from .constants import LOCAL_EXP, LOCAL_EXP_C
-from .errors import KphelperError
+from .errors import KpcliError
 from .pwn import log
 
 
@@ -38,4 +38,4 @@ def build_exp(source=LOCAL_EXP_C, output=LOCAL_EXP):
 
     message = "failed to compile exp.c with musl-gcc or gcc"
     log.failure(message)
-    raise KphelperError(message)
+    raise KpcliError(message)

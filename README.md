@@ -1,6 +1,6 @@
-# kphelper
+# kpcli
 
-`kphelper` is a small CLI helper for local kernel pwn challenge workflows. It can start a local QEMU script, upload a statically compiled exploit, connect KGDB, connect remote shells, inspect common kernel challenge security settings, and repack initramfs images.
+`kpcli` is a small CLI helper for local kernel pwn challenge workflows. It can start a local QEMU script, upload a statically compiled exploit, connect KGDB, connect remote shells, inspect common kernel challenge security settings, and repack initramfs images.
 
 The intended runtime environment is Linux/WSL.
 
@@ -22,7 +22,7 @@ pip3 install -e .
 After installation, use:
 
 ```bash
-kphelper
+kpcli
 ```
 
 Running without arguments prints the help text.
@@ -37,9 +37,9 @@ python3 -m unittest
 
 The code is split into four layers:
 
-- `kphelper/commands/`
+- `kpcli/commands/`
   - command entry points and argument parsing
-- `kphelper/core/`
+- `kpcli/core/`
   - reusable implementation logic
 - `tests/`
   - automated regression tests
@@ -48,22 +48,22 @@ The code is split into four layers:
 
 If you are new to the project, start with:
 
-- `kphelper/cli.py`
-- `kphelper/commands/kp_run.py`
-- `kphelper/core/session.py`
-- `kphelper/core/checksec.py`
-- `kphelper/core/symbols.py`
-- `kphelper/core/ksym.py`
+- `kpcli/cli.py`
+- `kpcli/commands/kp_run.py`
+- `kpcli/core/session.py`
+- `kpcli/core/checksec.py`
+- `kpcli/core/symbols.py`
+- `kpcli/core/ksym.py`
 
 ## Directory Requirements
 
-For `run` and `debug` modes, run `kphelper` inside a challenge directory containing:
+For `run` and `debug` modes, run `kpcli` inside a challenge directory containing:
 
 ```text
 run.sh
 ```
 
-For `debug`, the directory should also contain the symbol file you pass to the command. If omitted, `kphelper` recursively searches the current tree for:
+For `debug`, the directory should also contain the symbol file you pass to the command. If omitted, `kpcli` recursively searches the current tree for:
 
 ```text
 vmlinux
@@ -76,7 +76,7 @@ exp.c    # compiled to exp before target startup
 exp      # uploaded to /tmp/exp
 ```
 
-If `exp.c` exists, it is compiled before QEMU is started. `kphelper` tries `musl-gcc` first and falls back to:
+If `exp.c` exists, it is compiled before QEMU is started. `kpcli` tries `musl-gcc` first and falls back to:
 
 ```bash
 gcc -static -Os -s -o exp exp.c
@@ -91,18 +91,18 @@ $
 # 
 ```
 
-After upload, `kphelper` checks the remote file size with `wc -c < /tmp/exp`. If verification succeeds, it switches to `/tmp`; it does not execute `/tmp/exp` automatically.
+After upload, `kpcli` checks the remote file size with `wc -c < /tmp/exp`. If verification succeeds, it switches to `/tmp`; it does not execute `/tmp/exp` automatically.
 
 ## Commands
 
-### `kphelper init`
+### `kpcli init`
 
 Create an `exp.c` kernel pwn skeleton in the current directory.
 
 ```bash
-kphelper init
-kphelper init -o exploit.c
-kphelper init --force
+kpcli init
+kpcli init -o exploit.c
+kpcli init --force
 ```
 
 The template includes notes for:
@@ -113,30 +113,30 @@ The template includes notes for:
 - `commit_creds` / `prepare_kernel_cred` ROP
 - `msg_msg` / `userfaultfd` / `modprobe_path` primitives
 
-### `kphelper run`
+### `kpcli run`
 
 Compile `exp.c` if present, start local `./run.sh`, upload `exp` if available, switch to `/tmp`, then enter interactive mode.
 
 ```bash
-kphelper run
+kpcli run
 ```
 
-### `kphelper debug [symbol]`
+### `kpcli debug [symbol]`
 
 Generate a temporary debug copy of `run.sh`, preserve its original KASLR configuration, inject `-s -S`, compile `exp.c` if present, start that temporary script, prepare the target, then open KGDB in a tmux split. Pass `--nokaslr` only when you explicitly want the generated debug environment to disable KASLR.
 
 ```bash
-kphelper debug
-kphelper debug ./vmlinux
-kphelper debug ./module.ko
-kphelper debug --nokaslr
+kpcli debug
+kpcli debug ./vmlinux
+kpcli debug ./module.ko
+kpcli debug --nokaslr
 ```
 
 The default symbol file is `vmlinux`.
 
-The original `run.sh` is not modified. The temporary debug script is `.kphelper-run-debug.sh`.
+The original `run.sh` is not modified. The temporary debug script is `.kpcli-run-debug.sh`.
 
-For `vmlinux`, `kphelper` only connects with:
+For `vmlinux`, `kpcli` only connects with:
 
 ```text
 target remote localhost:1234
@@ -149,18 +149,18 @@ cat /sys/module/<module>/sections/.text
 add-symbol-file <module.ko> <base>
 ```
 
-### `kphelper symbols`
+### `kpcli symbols`
 
 Extract kernel symbols. Runtime extraction from the guest `/proc/kallsyms` is the default; use `--file` for static `vmlinux` extraction.
 
 ```bash
-kphelper symbols
-kphelper symbols --run ./run.sh
-kphelper symbols --remote 127.0.0.1 1337
-kphelper symbols --file ./vmlinux
-kphelper symbols -s commit_creds -s prepare_kernel_cred
-kphelper symbols -p
-kphelper symbols --json
+kpcli symbols
+kpcli symbols --run ./run.sh
+kpcli symbols --remote 127.0.0.1 1337
+kpcli symbols --file ./vmlinux
+kpcli symbols -s commit_creds -s prepare_kernel_cred
+kpcli symbols -p
+kpcli symbols --json
 ```
 
 Runtime mode waits for a verified guest shell prompt. `--boot-timeout` controls QEMU boot waiting and `--command-timeout` controls each guest command. Ensure QEMU uses serial stdio (`-nographic` or equivalent), does not run in the background, and does not include `-S` unless a debugger resumes the CPU.
@@ -190,23 +190,23 @@ Default output is C macro style for quick copy/paste into `exp.c`. Pass `-p` to
 render callable symbols as C function pointers; data symbols and stable KASLR
 offsets remain integer assignments.
 
-### `kphelper remote <ip> <port>`
+### `kpcli remote <ip> <port>`
 
 Compile `exp.c` if present, connect to a remote shell, upload `exp` if available, switch to `/tmp`, then enter interactive mode.
 
 ```bash
-kphelper remote 127.0.0.1 1337
+kpcli remote 127.0.0.1 1337
 ```
 
-### `kphelper pack [cpio]`
+### `kpcli pack [cpio]`
 
 Inject `exp` into an initramfs and update `run.sh` to use the repacked archive. This is the offline fallback path for challenges where shell upload is inconvenient or unavailable.
 
 ```bash
-kphelper pack
-kphelper pack rootfs.cpio
-kphelper pack rootfs.cpio.gz -o packed-rootfs.cpio.gz
-kphelper pack --target tmp/exp --no-update-run
+kpcli pack
+kpcli pack rootfs.cpio
+kpcli pack rootfs.cpio.gz -o packed-rootfs.cpio.gz
+kpcli pack --target tmp/exp --no-update-run
 ```
 
 Default behavior:
@@ -223,27 +223,27 @@ Default behavior:
 
 Current limitation: `pack` only rewrites direct `-initrd path` arguments. It does not rewrite variable-built QEMU arguments.
 
-### `kphelper checksec [cpio]`
+### `kpcli checksec [cpio]`
 
-Inspect common kernel challenge security settings from `run.sh`. Optionally unpack an initramfs cpio into the internal `.kphelper/checksec-root` cache and scan its startup scripts.
-If the cpio path is omitted, `kphelper` first tries the `-initrd` path in `run.sh`, then recursively searches the current tree for common rootfs/initramfs files.
+Inspect common kernel challenge security settings from `run.sh`. Optionally unpack an initramfs cpio into the internal `.kpcli/checksec-root` cache and scan its startup scripts.
+If the cpio path is omitted, `kpcli` first tries the `-initrd` path in `run.sh`, then recursively searches the current tree for common rootfs/initramfs files.
 
 ```bash
-kphelper checksec
-kphelper checksec rootfs.cpio
-kphelper checksec rootfs.cpio.gz
-kphelper checksec -r ./run.sh rootfs.cpio --no-color
-kphelper checksec --live
-kphelper checksec --live -p
-kphelper checksec --all --boot-timeout 30
-kphelper checksec --all
+kpcli checksec
+kpcli checksec rootfs.cpio
+kpcli checksec rootfs.cpio.gz
+kpcli checksec -r ./run.sh rootfs.cpio --no-color
+kpcli checksec --live
+kpcli checksec --live -p
+kpcli checksec --all --boot-timeout 30
+kpcli checksec --all
 ```
 
 The default mode performs static analysis only. `--live` and `--all` automatically create a separate analysis rootfs with fakeroot, change the supported challenge shell from UID/GID 1337 to UID/GID 0, and boot the generated run script. `--live` renders runtime probes only. `--all` renders the generated rootfs static report and then appends live results; if no interactive guest shell is reached, the live section is marked `Skipped` instead of discarding the static report. Add `-p` to either live mode to render callable symbols as function pointers. Use `--boot-timeout` and `--command-timeout` for slow guests.
 
 ```bash
-kphelper checksec --live
-kphelper checksec --all
+kpcli checksec --live
+kpcli checksec --all
 ```
 
 Live probes only supplement information that static analysis cannot confirm. For example, statically detected `kptr_restrict` and `dmesg_restrict` values are reused rather than read again. Permission-dependent probes are reported as `Skipped` or `Hidden` instead of aborting the complete report.
@@ -255,7 +255,7 @@ The output uses color by default:
 - Yellow: unknown
 - Cyan: paths and informational values
 
-Implementation note: the `checksec` output renderer now lives in `kphelper/core/checksec_report.py`, while parsing and detection stay in `kphelper/core/checksec.py`.
+Implementation note: the `checksec` output renderer now lives in `kpcli/core/checksec_report.py`, while parsing and detection stay in `kpcli/core/checksec.py`.
 
 Current limitation: `checksec` parses `run.sh` statically with regexes. It works for ordinary direct QEMU invocations, but does not reliably resolve shell variables or argument construction such as:
 
@@ -271,41 +271,41 @@ In those cases `Unknown` means "not statically resolved", not necessarily disabl
 Extract an initramfs into a workspace without changing its contents:
 
 ```bash
-kphelper rootfs extract
-kphelper rootfs extract rootfs.cpio.gz
-kphelper rootfs extract rootfs.cpio.gz --root .kphelper/rootfs
+kpcli rootfs extract
+kpcli rootfs extract rootfs.cpio.gz
+kpcli rootfs extract rootfs.cpio.gz --root .kpcli/rootfs
 ```
 
-The default extraction directory is `.kphelper/rootfs`. The command stores fakeroot metadata beside it in `.kphelper/rootfs.fakeroot-state`, preserving ownership and device metadata across separate commands.
+The default extraction directory is `.kpcli/rootfs`. The command stores fakeroot metadata beside it in `.kpcli/rootfs.fakeroot-state`, preserving ownership and device metadata across separate commands.
 
 Repack the extracted tree without injecting files or rewriting `run.sh`:
 
 ```bash
-kphelper rootfs repack
-kphelper rootfs repack .kphelper/rootfs -o .kphelper/rootfs-repacked.cpio.gz
+kpcli rootfs repack
+kpcli rootfs repack .kpcli/rootfs -o .kpcli/rootfs-repacked.cpio.gz
 ```
 
-The extraction workspace contains only archive entries; fakeroot state is stored beside it. The internal `.kphelper-cpio-source` cache marker is also excluded defensively during repacking. Any edits made manually between extraction and repacking are included; kphelper applies no content changes by default. Repacking preserves paths, regular-file contents, modes, ownership, and device metadata, while archive ordering, compression, and some directory timestamps may differ.
+The extraction workspace contains only archive entries; fakeroot state is stored beside it. The internal `.kpcli-cpio-source` cache marker is also excluded defensively during repacking. Any edits made manually between extraction and repacking are included; kpcli applies no content changes by default. Repacking preserves paths, regular-file contents, modes, ownership, and device metadata, while archive ordering, compression, and some directory timestamps may differ.
 
 ## Analysis rootfs
 
 Create a separate local analysis image when the original guest drops privileges or restricts symbol information:
 
 ```bash
-kphelper rootfs make-analysis
-kphelper rootfs make-analysis rootfs.cpio.gz
+kpcli rootfs make-analysis
+kpcli rootfs make-analysis rootfs.cpio.gz
 ```
 
 The flow uses `fakeroot` to preserve cpio ownership and device metadata without requesting a password. Set `FAKEROOTDONTTRYCHOWN=1` for fakeroot subprocesses so the workflow also operates inside user namespaces where real ownership changes are rejected.
 
-This creates `.kphelper/analysis-rootfs.cpio.gz` and `.kphelper/run-analysis.sh`. The original initramfs and `run.sh` are never modified. The generator makes only the supported final shell identity change and does not place backup scripts in startup directories.
+This creates `.kpcli/analysis-rootfs.cpio.gz` and `.kpcli/run-analysis.sh`. The original initramfs and `run.sh` are never modified. The generator makes only the supported final shell identity change and does not place backup scripts in startup directories.
 
 `checksec --live/--all` always creates this environment automatically. The standalone command remains available when only the generated files are needed:
 
 ```bash
-kphelper symbols --analysis --refresh
-kphelper checksec --live
-kphelper checksec --all
+kpcli symbols --analysis --refresh
+kpcli checksec --live
+kpcli checksec --all
 ```
 
 The analysis image deliberately differs from the original privilege configuration and is intended only for local investigation. If the original command line enables KASLR, collected absolute addresses are valid for the current boot only. Module addresses can also depend on module load order even with `nokaslr`.
@@ -315,10 +315,10 @@ The analysis image deliberately differs from the original privilege configuratio
 Command entry points live under:
 
 ```text
-kphelper/commands/
+kpcli/commands/
 ```
 
-Each production command is explicitly listed in `kphelper/commands/__init__.py`. Command files use the prefix:
+Each production command is explicitly listed in `kpcli/commands/__init__.py`. Command files use the prefix:
 
 ```text
 kp_<command>.py
@@ -338,14 +338,14 @@ def handle(args):
     return 0
 ```
 
-After adding `kphelper/commands/kp_snapshot.py`, register `kp_snapshot` in `COMMAND_MODULES` to expose:
+After adding `kpcli/commands/kp_snapshot.py`, register `kp_snapshot` in `COMMAND_MODULES` to expose:
 
 ```bash
-kphelper snapshot
+kpcli snapshot
 ```
 
 Shared reusable logic lives under:
 
 ```text
-kphelper/core/
+kpcli/core/
 ```

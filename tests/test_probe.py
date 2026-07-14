@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from kphelper.core.findings import Finding, RuntimeProbeReport
-from kphelper.core.probe import HIDDEN, READABLE, _probe_kallsyms, probe_runtime
+from kpcli.core.findings import Finding, RuntimeProbeReport
+from kpcli.core.probe import HIDDEN, READABLE, _probe_kallsyms, probe_runtime
 
 
 class ProbeTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(finding.detail, "kptr_restrict=1")
         self.assertEqual(symbols, {})
 
-    @patch("kphelper.core.probe.GuestShell")
+    @patch("kpcli.core.probe.GuestShell")
     def test_probe_runtime_returns_structured_report(self, guest_shell):
         shell = guest_shell.return_value
         shell.run.side_effect = [

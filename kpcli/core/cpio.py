@@ -6,10 +6,11 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
-from .errors import KphelperError
+from .errors import KpcliError
 
 
-CPIO_MARKER = ".kphelper-cpio-source"
+CPIO_MARKER = ".kpcli-cpio-source"
+LEGACY_CPIO_MARKER = ".kphelper-cpio-source"
 
 
 def sh_quote(value):
@@ -52,13 +53,13 @@ def preserved_metadata_state(state_path=None):
         yield None
         return
     if not shutil.which("fakeroot"):
-        raise KphelperError("fakeroot not found; install fakeroot for initramfs operations")
+        raise KpcliError("fakeroot not found; install fakeroot for initramfs operations")
     if state_path is not None:
         state_path = Path(state_path).resolve()
         state_path.parent.mkdir(parents=True, exist_ok=True)
         yield state_path
         return
-    with tempfile.TemporaryDirectory(prefix="kphelper-fakeroot-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="kpcli-fakeroot-") as temporary:
         yield Path(temporary) / "state"
 
 
@@ -84,7 +85,7 @@ def run_cpio_command(
 def unpack_cpio(cpio_path, root_dir="root", reuse_existing=True, fakeroot_state=None):
     cpio_path = Path(cpio_path).resolve()
     if not cpio_path.is_file():
-        raise KphelperError("initramfs not found: %s" % cpio_path)
+        raise KpcliError("initramfs not found: %s" % cpio_path)
     root_dir = Path(root_dir)
     root_dir.mkdir(parents=True, exist_ok=True)
 
@@ -95,7 +96,7 @@ def unpack_cpio(cpio_path, root_dir="root", reuse_existing=True, fakeroot_state=
 
     if any(root_dir.iterdir()):
         if not marker.exists():
-            raise KphelperError(
+            raise KpcliError(
                 "refusing to replace non-empty directory without %s marker: %s"
                 % (CPIO_MARKER, root_dir)
             )
@@ -106,9 +107,9 @@ def unpack_cpio(cpio_path, root_dir="root", reuse_existing=True, fakeroot_state=
     try:
         run_cpio_command(cmd, root_dir, fakeroot_state=fakeroot_state)
     except FileNotFoundError as error:
-        raise KphelperError("bash not found; initramfs operations require Linux/WSL") from error
+        raise KpcliError("bash not found; initramfs operations require Linux/WSL") from error
     except subprocess.CalledProcessError as error:
-        raise KphelperError("failed to unpack %s, exit code: %d" % (cpio_path, error.returncode)) from error
+        raise KpcliError("failed to unpack %s, exit code: %d" % (cpio_path, error.returncode)) from error
 
     marker.write_text(json.dumps(fingerprint, indent=2), encoding="utf-8")
     return root_dir

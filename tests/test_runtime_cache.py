@@ -3,9 +3,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from kphelper.core.errors import KphelperError
-from kphelper.core.findings import Finding, RuntimeProbeReport
-from kphelper.core.runtime_cache import (
+from kpcli.core.errors import KpcliError
+from kpcli.core.findings import Finding, RuntimeProbeReport
+from kpcli.core.runtime_cache import (
     build_kaslr_metadata,
     load_runtime_report,
     save_runtime_report,
@@ -26,12 +26,12 @@ class RuntimeCacheTests(unittest.TestCase):
         )
         return run_path, kernel
 
-    @patch("kphelper.core.runtime_cache.extract_symbols", side_effect=KphelperError("no vmlinux"))
+    @patch("kpcli.core.runtime_cache.extract_symbols", side_effect=KpcliError("no vmlinux"))
     def test_report_round_trip_and_assignment_header(self, _extract):
         with tempfile.TemporaryDirectory() as tmp:
             run_path, _kernel = self._challenge(tmp)
-            report_path = Path(tmp) / ".kphelper/runtime-report.json"
-            header_path = Path(tmp) / ".kphelper/runtime-symbols.h"
+            report_path = Path(tmp) / ".kpcli/runtime-report.json"
+            header_path = Path(tmp) / ".kpcli/runtime-symbols.h"
 
             saved = save_runtime_report(
                 RuntimeProbeReport(
@@ -49,7 +49,7 @@ class RuntimeCacheTests(unittest.TestCase):
             self.assertEqual(loaded["symbols"]["commit_creds"], 0xffffffff81070000)
             self.assertIn("unsigned long commit_creds", header_path.read_text())
 
-    @patch("kphelper.core.runtime_cache.extract_symbols", side_effect=KphelperError("no vmlinux"))
+    @patch("kpcli.core.runtime_cache.extract_symbols", side_effect=KpcliError("no vmlinux"))
     def test_changed_kernel_invalidates_cached_report(self, _extract):
         with tempfile.TemporaryDirectory() as tmp:
             run_path, kernel = self._challenge(tmp)
@@ -63,10 +63,10 @@ class RuntimeCacheTests(unittest.TestCase):
             )
             kernel.write_bytes(b"changed kernel")
 
-            with self.assertRaisesRegex(KphelperError, "stale"):
+            with self.assertRaisesRegex(KpcliError, "stale"):
                 load_runtime_report(report_path)
 
-    @patch("kphelper.core.runtime_cache.extract_symbols", side_effect=KphelperError("no vmlinux"))
+    @patch("kpcli.core.runtime_cache.extract_symbols", side_effect=KpcliError("no vmlinux"))
     def test_kaslr_metadata_keeps_offsets_relative_to_runtime_anchor(self, _extract):
         with tempfile.TemporaryDirectory() as tmp:
             run_path, _kernel = self._challenge(tmp, cmdline="console=ttyS0 kaslr")
